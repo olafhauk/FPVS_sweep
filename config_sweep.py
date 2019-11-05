@@ -18,7 +18,7 @@ cbu_path = '/megdata/cbu/fpvs'
 # path to data for pre-processing
 data_path = '/group/erp/data/olaf.hauk/MEG/FPVS/data_sweep'
 
-if not os.path.isdir(data_path): # create if necessary
+if not os.path.isdir(data_path):  # create if necessary
     os.mkdir(data_path)
 
 # Compute TRF (1) or not (0)
@@ -34,17 +34,52 @@ map_subjects = {
     4: ('meg19_0384', '191021'),  # pilot frequency sweep
 }
 
-# create subject-specific data directories if necessary
-for ss in map_subjects:
-    subjects_dir = os.path.join(data_path, map_subjects[ss][0]) # subject data dir
-    if not os.path.isdir(subjects_dir):
-        print('Creating directory %s.' % subjects_dir)
-        os.mkdir(subjects_dir)
-    fig_dir = os.path.join(data_path, map_subjects[ss][0], 'Figures') # subject figure dir
-    if not os.path.isdir(fig_dir):
-        print('Creating directory %s.' % fig_dir)
-        os.mkdir(fig_dir)
+# which files to maxfilter and how to name them after sss
+# [before maxfilter], [after maxfilter], [condition labels],
+# [presentation/oddball frequencies]
 
+sss_map_fnames = {
+    1: (['rest1_raw', 'rest2_raw',
+         'Faces_raw',
+         'hfwpw1_raw', 'hfwpw2_raw', 'HFWPW3_raw',
+         'LFWPW1_raw', 'LFWPW2_raw', 'LFWPW3_raw',
+         'HFWLFW1_raw', 'HFWLFW2_raw', 'HFWLFW3_raw'],
+        ['rest1_sss_raw', 'rest2_sss_raw',
+         'faces_sss_raw',
+         'pwhf1_sss_raw', 'pwhf2_sss_raw', 'pwhf3_sss_raw',
+         'pwlf1_sss_raw', 'pwlf2_sss_raw', 'pwlf3_sss_raw',
+         'lfhfw1_sss_raw', 'lfhf2_sss_raw', 'lfhf3_sss_raw']),
+    2: (['rest1_raw', 'rest2_raw',
+         'faces_raw',
+         'pwhf1_raw', 'pwhf2_raw', 'pwhf3_raw',
+         'pwlf1_raw', 'pwlf2_raw', 'pwlf3_raw',
+         'lfhf1_raw', 'lfhf2_raw', 'lfhf3_raw'],
+        ['rest1_sss_raw', 'rest2_sss_raw',
+         'faces_sss_raw',
+         'pwhf1_sss_raw', 'pwhf2_sss_raw', 'pwhf3_sss_raw',
+         'pwlf1_sss_raw', 'pwlf2_sss_raw', 'pwlf3_sss_raw',
+         'lfhf1_sss_raw', 'lfhf2_sss_raw', 'lfhf3_sss_raw']),
+    3: (['rest1_raw', 'rest2_raw',
+         'faces_raw',
+         'pwhf1_raw', 'pwhf2_raw', 'pwhf3_raw',
+         'pwlf1_raw', 'pwlf2_raw', 'pwlf3_raw',
+         'lfhf1_raw', 'lfhf2_raw', 'lfhf3_raw'],
+        ['rest1_sss_raw', 'rest2_sss_raw',
+         'faces_sss_raw',
+         'pwhf1_sss_raw', 'pwhf2_sss_raw', 'pwhf3_sss_raw',
+         'pwlf1_sss_raw', 'pwlf2_sss_raw', 'pwlf3_sss_raw',
+         'lfhf1_sss_raw', 'lfhf2_sss_raw', 'lfhf3_sss_raw']),
+    4: (['rest1_raw', 'rest2_raw',
+         'faces_raw',
+         'pwhf1_raw', 'pwhf2_raw', 'pwhf3_raw',
+         'pwlf1_raw', 'pwlf2_raw', 'pwlf3_raw',
+         'lfhf1_raw', 'lfhf2_raw', 'lfhf3_raw'],
+        ['rest1_sss_raw', 'rest2_sss_raw',
+         'faces_sss_raw',
+         'pwhf1_sss_raw', 'pwhf2_sss_raw', 'pwhf3_sss_raw',
+         'pwlf1_sss_raw', 'pwlf2_sss_raw', 'pwlf3_sss_raw',
+         'lfhf1_sss_raw', 'lfhf2_sss_raw', 'lfhf3_sss_raw']),
+}
 
 ###############################################################################
 # Bad channels
@@ -59,6 +94,20 @@ bad_channels = {
     4: {'eeg': ['EEG012'],
         'meg': ['MEG0723', 'MEG1123', 'MEG0813']},
 }
+
+
+# create subject-specific data directories if necessary
+for ss in map_subjects:
+    subjects_dir = os.path.join(data_path, map_subjects[ss][0]) # subject data dir
+    if not os.path.isdir(subjects_dir):
+        print('Creating directory %s.' % subjects_dir)
+        os.mkdir(subjects_dir)
+    fig_dir = os.path.join(data_path, map_subjects[ss][0], 'Figures') # subject figure dir
+    if not os.path.isdir(fig_dir):
+        print('Creating directory %s.' % fig_dir)
+        os.mkdir(fig_dir)
+
+
 
 # For subjects without clean ECG channel,
 # use the following magnetometers in ICA (else specify '' to use ECG)
@@ -123,54 +172,6 @@ psd_n_gap = 0
 
 ###############################################################################
 # Maxfilter etc.
-
-# which files to maxfilter and how to name them after sss
-# [before maxfilter], [after maxfilter], [condition labels],
-# [presentation/oddball frequencies]
-
-sss_map_fnames = {
-    1: (['rest1_raw', 'rest2_raw',
-         'Faces_raw',
-         'hfwpw1_raw', 'hfwpw2_raw', 'HFWPW3_raw',
-         'LFWPW1_raw', 'LFWPW2_raw', 'LFWPW3_raw',
-         'HFWLFW1_raw', 'HFWLFW2_raw', 'HFWLFW3_raw'],
-        ['rest1_sss_raw', 'rest2_sss_raw',
-         'faces_sss_raw',
-         'pwhf1_sss_raw', 'pwhf2_sss_raw', 'pwhf3_sss_raw',
-         'pwlf1_sss_raw', 'pwlf2_sss_raw', 'pwlf3_sss_raw',
-         'lfhfw1_sss_raw', 'lfhf2_sss_raw', 'lfhf3_sss_raw']),
-    2: (['rest1_raw', 'rest2_raw',
-         'faces_raw',
-         'pwhf1_raw', 'pwhf2_raw', 'pwhf3_raw',
-         'pwlf1_raw', 'pwlf2_raw', 'pwlf3_raw',
-         'lfhf1_raw', 'lfhf2_raw', 'lfhf3_raw'],
-        ['rest1_sss_raw', 'rest2_sss_raw',
-         'faces_sss_raw',
-         'pwhf1_sss_raw', 'pwhf2_sss_raw', 'pwhf3_sss_raw',
-         'pwlf1_sss_raw', 'pwlf2_sss_raw', 'pwlf3_sss_raw',
-         'lfhf1_sss_raw', 'lfhf2_sss_raw', 'lfhf3_sss_raw']),
-    3: (['rest1_raw', 'rest2_raw',
-         'faces_raw',
-         'pwhf1_raw', 'pwhf2_raw', 'pwhf3_raw',
-         'pwlf1_raw', 'pwlf2_raw', 'pwlf3_raw',
-         'lfhf1_raw', 'lfhf2_raw', 'lfhf3_raw'],
-        ['rest1_sss_raw', 'rest2_sss_raw',
-         'faces_sss_raw',
-         'pwhf1_sss_raw', 'pwhf2_sss_raw', 'pwhf3_sss_raw',
-         'pwlf1_sss_raw', 'pwlf2_sss_raw', 'pwlf3_sss_raw',
-         'lfhf1_sss_raw', 'lfhf2_sss_raw', 'lfhf3_sss_raw']),
-    4: (['rest1_raw', 'rest2_raw',
-         'faces_raw',
-         'pwhf1_raw', 'pwhf2_raw', 'pwhf3_raw',
-         'pwlf1_raw', 'pwlf2_raw', 'pwlf3_raw',
-         'lfhf1_raw', 'lfhf2_raw', 'lfhf3_raw'],
-        ['rest1_sss_raw', 'rest2_sss_raw',
-         'faces_sss_raw',
-         'pwhf1_sss_raw', 'pwhf2_sss_raw', 'pwhf3_sss_raw',
-         'pwlf1_sss_raw', 'pwlf2_sss_raw', 'pwlf3_sss_raw',
-         'lfhf1_sss_raw', 'lfhf2_sss_raw', 'lfhf3_sss_raw']),
-}
-
 
 # parameters for Neuromag maxfilter command
 MF = {

@@ -26,13 +26,13 @@ fname_wrap = op.join('/', 'home', 'olaf', 'MEG', 'FPVS', 'MNE-Python',
 subjs = [1, 2, 3, 4]
 
 job_list = [
-    # # Neuromag Maxfilter
-    # {'N':   'F_MF',                  # job name
-    #  'Py':  'FPVS_Maxfilter_sweep',  # Python script
-    #  'Ss':  subjs,                    # subject indices
-    #  'mem': '16G',                   # memory for qsub process
-    #  'dep': '',                       # name of preceeding process (optional)
-    #  'node': '--constraint=maxfilter'},  # node constraint for MF, just picked one
+    # Neuromag Maxfilter
+    {'N':   'F_MF',                  # job name
+     'Py':  'FPVS_Maxfilter_sweep',  # Python script
+     'Ss':  subjs,                    # subject indices
+     'mem': '16G',                   # memory for qsub process
+     'dep': '',                       # name of preceeding process (optional)
+     'node': '--constraint=maxfilter'},  # node constraint for MF, just picked one
     # fix EEG electrode positions in fiff-files
     # # NOTE: Can get "Permission denied"
     # {'N':   'F_FE',                    # job name
@@ -61,18 +61,18 @@ job_list = [
     #  'dep': 'F_CICA'},                      # name of preceeding process (optional)
 
 
-    ### Get sweeps from raw data and average
-    {'N':   'F_GS',                  # job name
-     'Py':  'FPVS_get_sweeps',          # Python script
-     'Ss':  subjs,                    # subject indices
-     'mem': '8G',                    # memory for qsub process
-     'dep': ''},
-    ### Compute PSDs for averaged sweeps and plot
-    {'N':   'F_PSD',                  # job name
-     'Py':  'FPVS_PSD_sweep',          # Python script
-     'Ss':  subjs,                    # subject indices
-     'mem': '8G',                    # memory for qsub process
-     'dep': 'F_GS'},
+    # ### Get sweeps from raw data and average
+    # {'N':   'F_GS',                  # job name
+    #  'Py':  'FPVS_get_sweeps',          # Python script
+    #  'Ss':  subjs,                    # subject indices
+    #  'mem': '8G',                    # memory for qsub process
+    #  'dep': ''},
+    # ### Compute PSDs for averaged sweeps and plot
+    # {'N':   'F_PSD',                  # job name
+    #  'Py':  'FPVS_PSD_sweep',          # Python script
+    #  'Ss':  subjs,                    # subject indices
+    #  'mem': '8G',                    # memory for qsub process
+    #  'dep': 'F_GS'},
 
     # ### Rename triggers
     # {'N':   'SR_RT',                  # job name
