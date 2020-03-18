@@ -43,9 +43,10 @@ def run_filter_raw(sbj_id):
 
     for raw_stem_in in sss_map_fname[1]:
 
+        # input file to read
         raw_fname_in = op.join(sbj_path, raw_stem_in + '.fif')
 
-        # assumes that file ends in "raw.fif"
+        # result file to write
         raw_fname_out = raw_fname_in[:-7] + 'f_raw.fif'
 
         print('\n###\nReading raw file %s.' % raw_fname_in)
@@ -58,16 +59,14 @@ def run_filter_raw(sbj_id):
         # ONLY FOR EEG
         if any('EEG' in ch for ch in raw.info['ch_names']):
 
-            print('EEG channels found.\n')
-
             print('Marking bad EEG channels: %s' % bad_eeg)
             raw.info['bads'] = bad_eeg
 
-            print('Setting EEG reference.')
-            raw.set_eeg_reference(ref_channels='average')
-
             print('Interpolating bad EEG channels.')
             raw.interpolate_bads(mode='accurate', reset_bads=True)
+
+            print('Setting EEG reference.')
+            raw.set_eeg_reference(ref_channels='average')
 
         else:
 
@@ -82,8 +81,11 @@ def run_filter_raw(sbj_id):
                                                           str(config.h_freq)))
 
         # broad filter, including VGBR and ASSR frequencies
-        raw.filter(l_freq=config.l_freq, h_freq=config.h_freq,
-                   fir_design='firwin')
+        # most settings are the MNE-Python defaults (zero-phase FIR)
+        # https://mne.tools/dev/auto_tutorials/discussions/plot_background_filtering.html
+        raw.filter(l_freq=config.l_freq, h_freq=config.h_freq, method='fir',
+                   fir_design='firwin', filter_length='auto',
+                   l_trans_bandwidth='auto', h_trans_bandwidth='auto')
 
         print('Saving data to %s.' % raw_fname_out)
         raw.save(raw_fname_out, overwrite=True)

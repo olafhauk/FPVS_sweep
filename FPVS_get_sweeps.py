@@ -6,6 +6,7 @@ Read raw data, find runs, segment into individual frequency sweeps,
 average sweeps across runs, write the average as raw file
 (and ascii file if desired).
 Compute TFR if specified.
+Needs event file from filtering step.
 ==========================================
 
 OH, October 2019
@@ -17,11 +18,6 @@ from os import path as op
 import numpy as np
 
 from copy import deepcopy
-
-# import matplotlib
-# matplotlib.use('Agg') #  for running graphics on cluster ### EDIT
-
-from matplotlib import pyplot as plt
 
 from importlib import reload
 
@@ -37,30 +33,23 @@ reload(config)
 
 print(mne.__version__)
 
-# endings of raw files, e.g. with/without ICA
-raw_fname_end = 'f_raw_ica.fif'
-# raw_fname_end = 'f_raw.fif'
-
-# perform TFR of raw data or not
+# perform TFR of raw data or not - outdated
 do_tfr = config.do_tfr
 
 close_fig = 1  # close figures only if close_fig==1
 
-ascii_eeg_edf = 1  # write average raw data for EEG also as ascii and edf files?
+ascii_eeg_edf = 0  # !=0 if EEG also output as ascii and edf files
 
 # plt.ion() # interactive plotting
 
 
 def run_get_sweeps(sbj_id):
     """Compute spectra for one subject."""
-
     # path to subject's data
     sbj_path = op.join(config.data_path, config.map_subjects[sbj_id][0])
 
     # raw-filename mappings for this subject
     sss_map_fname = config.sss_map_fnames[sbj_id]
-
-    fig = {}  # figures
 
     # initialise dict for results
     # one dict per condition (e.g. 'hflf'), then for frequency (e.g. '12.'),
@@ -72,6 +61,7 @@ def run_get_sweeps(sbj_id):
 
     names = np.unique(names)
 
+    # initialise for data at different sweep frequencies
     data_runs = {}
     for name in names:
 
@@ -88,29 +78,27 @@ def run_get_sweeps(sbj_id):
 
                 data_runs[name][str(freq)] = []
 
-
     # Note: Skip first two files since they are rest, no events
     for raw_stem_in in sss_map_fname[1][2:]:
 
-        # raw_fname_in = op.join(sbj_path, raw_stem_in[:-3] + 'f_raw_ica.fif')
-        raw_fname_in = op.join(sbj_path, raw_stem_in[:-3] + raw_fname_end)
+        # omit "_raw" in middle of filename
+        raw_fname_in = op.join(sbj_path, raw_stem_in[:-4] + '_f_' +
+                               config.raw_ICA_suff + '.fif')
 
         print('\n###\nReading raw file %s.' % raw_fname_in)
         raw_ori = mne.io.read_raw_fif(raw_fname_in, preload=True)
 
         raw = deepcopy(raw_ori)  # keep raw_ori for possible TFR analysis
 
-        # Check if EEG data present in fiff-file
-        is_eeg = raw.__contains__('eeg')
-
-        eeg, meg = is_eeg, True
-
+        # event file was written during filtering
         event_file = op.join(sbj_path, raw_stem_in + '_sss_f_raw-eve.fif')
         print('Reading events from %s.' % event_file)
         events = mne.read_events(event_file)
 
         # Find indices of good events (onsets of runs without missing frames)
         event_ids = config.fpvs_event_ids
+
+        # duration of run incl. all sweeps and lead-in time at beginning
         run_duration = config.fpvs_n_sweeps * config.fpvs_sweep_duration + \
             config.fpvs_leadin
 
@@ -165,7 +153,7 @@ def run_get_sweeps(sbj_id):
 
                     data_runs[raw_stem_in[:4]][str(ff)].append(raw_sweeps[fi])
 
-    # average raw files per condition and frequency across runs
+    # AVERAGE raw files per condition and frequency across runs
     # write the result as raw fiff-file
     for cond in data_runs.keys():  # conditions
 
@@ -174,7 +162,9 @@ def run_get_sweeps(sbj_id):
             raw_avg = average_raws(data_runs[cond][freq])
 
             # remove dot from frequency string
-            fname = 'rawavg_%s_%s.fif' % (cond, ''.join(freq.split('.')))
+            fname = 'rawavg_%s_%s_%s.fif' % (cond, ''.join(freq.split('.')),
+                                             config.raw_ICA_suff)
+
             fname_raw_out = op.join(sbj_path, fname)
 
             print('Writing average raw data to %s:' % fname_raw_out)
@@ -188,7 +178,8 @@ def run_get_sweeps(sbj_id):
                 raw_avg_eeg = raw_avg.pick_types(meg=False, eeg=True)
 
                 # ASCII
-                fname = 'rawavg_%s_%s_eeg.asc' % (cond, ''.join(freq.split('.')))
+                fname = 'rawavg_%s_%s_eeg.asc' % (cond,
+                                                  ''.join(freq.split('.')))
                 fname_asc_out = op.join(sbj_path, fname)
 
                 data_out = raw_avg_eeg.get_data()
@@ -211,14 +202,22 @@ def run_get_sweeps(sbj_id):
 
 def find_good_events(events, event_ids, run_duration, sfreq):
     """Find the onsets of good runs in raw data.
+
     Parameters:
-    events: events from raw data
-    event_ids: list of int, possible triggers of run onsets
-    run_duration: duration (s) of a run within session
-    sfreq: float, sampling frequency (Hz)
+    events: nd-array
+        Events from raw data.
+    event_ids: list of int
+        Possible triggers of run onsets
+    run_duration: float
+        Duration (s) of a run within session
+    sfreq: float
+        Sampling frequency (Hz)
+
     Returns:
-    idx_good: list of indices to onsets of good runs
-    idx_bad: list of indices to onsets of bad runs
+    idx_good: list of int
+        Indices to onsets of good runs.
+    idx_bad: list of int
+        List of indices to onsets of bad runs
     """
     max_missed = 2  # how many frames turn a run invalid
 
@@ -226,8 +225,6 @@ def find_good_events(events, event_ids, run_duration, sfreq):
 
     # number of indices for events in this run
     n_idx = int(run_duration * sfreq)
-
-    print(n_idx)
 
     # find all onsets in events based on event_ids
     onsets = [ee for ee in events if (ee[2] in event_ids)]
@@ -241,15 +238,13 @@ def find_good_events(events, event_ids, run_duration, sfreq):
         idx_run = np.where((events[:, 0] > onset[0]) &
                            (events[:, 0] < onset[0] + n_idx))[0]
 
-        print(idx_run[0])
-        print(idx_run[-1])
-
         # get all events for this run
         events_run = events[idx_run, :]
 
         # check if missed frames present, and how many
         missed_frames = np.where(events_run[:, 2] == 20)[0]
 
+        print('Missed frames:')
         print(missed_frames)
 
         # if good run found
@@ -266,23 +261,32 @@ def find_good_events(events, event_ids, run_duration, sfreq):
 
 def get_sweeps_from_raw(raw, t0, sweep_duration, n_sweeps):
     """Get segments from raw data for individual frequency sweeps.
+
     Parameters:
     raw: instance of Raw
-    t0: start time of segment in s
-    sweep_duration: duration of one sweep at one frequency (s)
-    n_sweeps: int, number of sweeps (frequencies) per run
+        The raw data including frequency sweeps.
+    t0: float
+        Start time of segment in s.
+    sweep_duration: float
+        Duration of one sweep at one frequency (s).
+    n_sweeps: int
+        Number of sweeps (frequencies) per run.
+
     Returns:
-    raw_sweeps: list of raw instances per data segments, one per frequency
+    raw_sweeps: list of raw instances 
+        Data segments per frequency.
     """
     raw_sweeps = []  # initialise output
 
     for ss in np.arange(0, n_sweeps):
 
+        # Start and end latencies of one frequency sweep
         tmin = t0 + (ss * sweep_duration)
         tmax = t0 + (ss + 1) * sweep_duration
 
         raw_cp = raw.copy()
 
+        # Crop out one frequency sweep
         raw_cp.crop(tmin=tmin, tmax=tmax)
 
         raw_sweeps.append(raw_cp)
@@ -292,12 +296,15 @@ def get_sweeps_from_raw(raw, t0, sweep_duration, n_sweeps):
 
 def average_raws(raws):
     """Average data across raw files.
+
     Parameters:
     raws: list of instances of Raw
+        The raw data to average.
+        Every item of raws must have same info.
+
     Returns:
     raw_avg: instance of Raw
-    Contains average of raw data from raws.
-    Every item of raws must have same info.
+        The average of raw data.
     """
     # get data array from first file
     data = raws[0].get_data()
@@ -310,19 +317,16 @@ def average_raws(raws):
 
         data = data / len(raws)
 
-    # con't understand 'copy' option, using default
+    # don't understand 'copy' option, using default
     raw_avg = mne.io.RawArray(data, raws[0].info, first_samp=0, copy='auto')
 
     return raw_avg
 
 
-
-
-
 # get all input arguments except first
-if len(sys.argv)==1:
+if len(sys.argv) == 1:
 
-    sbj_ids = np.arange(0,len(config.map_subjects)) + 1
+    sbj_ids = np.arange(0, len(config.map_subjects)) + 1
 
 else:
 
@@ -334,5 +338,3 @@ for ss in sbj_ids:
 
     # raw, psds, psds_as_evo, freqs = run_PSD_raw(ss)
     data_runs = run_get_sweeps(ss)
-
-print('Done.')

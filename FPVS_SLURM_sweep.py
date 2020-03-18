@@ -7,6 +7,8 @@ SLURM, Python 3
 ==========================================
 
 OH, modified October 2019
+modified by Federica M for more subjects (ERP drive, MEG/FPVS/Scripts_Federica),
+then re-adapted by OH Jan 2020
 """
 
 import subprocess
@@ -23,7 +25,19 @@ fname_wrap = op.join('/', 'home', 'olaf', 'MEG', 'FPVS', 'MNE-Python',
 # EDIT
 # subjs = [1, 2]
 # subjs = [3, 4]
-subjs = [1, 2, 3, 4]
+# subjs = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+# subjs = [10, 11, 12, 13, 14] # up to FR excpet 13
+# subjs = [15] 
+# subjs = [16] up to Maxfilter
+# subjs = [17]
+# subjs = [13] 
+# subjs = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14] # done GS and PSD -> missing 13
+# subjs = [13, 16, 17]
+# subjs = [1] # check how looks after changing channels
+# subjs = [1, 13, 15]
+subjs = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 15, 17, 18]
+# subjs = [8]
+
 
 job_list = [
     # Neuromag Maxfilter
@@ -33,13 +47,15 @@ job_list = [
      'mem': '16G',                   # memory for qsub process
      'dep': '',                       # name of preceeding process (optional)
      'node': '--constraint=maxfilter'},  # node constraint for MF, just picked one
-    # fix EEG electrode positions in fiff-files
-    # # NOTE: Can get "Permission denied"
+
+    # # fix EEG electrode positions in fiff-files
+    # # NOTE: Can get "Permission denied"; should be run separately
     # {'N':   'F_FE',                    # job name
     #  'Py':  'FPVS_fix_electrodes_sweep',      # Python script
     #  'Ss':  subjs,                    # subject indices
     #  'mem': '1G',                    # memory for qsub process
     #  'dep': ''},                       # name of preceeding process (optional)
+
     # ### Filter raw data
     # {'N':   'F_FR',                  # job name
     #  'Py':  'FPVS_filter_raw_sweep',          # Python script
@@ -47,90 +63,53 @@ job_list = [
     #  'mem': '16G',                    # memory for qsub process
     #  'dep': ''},                      # name of preceeding process (optional)
 
-    #  ### Compute ICA
+    # # ### Filter raw data FM-> generating also txt event file
+    # # {'N':   'F_FR',                  # job name
+    # #  'Py':  'FPVS_filter_raw_sweep_txtfile',          # Python script
+    # #  'Ss':  subjs,                    # subject indices
+    # #  'mem': '16G',                    # memory for qsub process
+    # #  'dep': 'F_FR'},                      # name of preceeding process (optional)
+
+    # #  ### Compute ICA
     # {'N':   'F_CICA',                  # job name
     #  'Py':  'FPVS_Compute_ICA_sweep',          # Python script
     #  'Ss':  subjs,                    # subject indices
-    #  'mem': '4G',                    # memory for qsub process
-    #  'dep': ''},                      # name of preceeding process (optional)
-    #   ### Apply ICA
-    # {'N':   'FP_AICA',                  # job name
+    #  'mem': '32G',                    # memory for qsub process
+    #  'dep': 'F_FR'},                      # name of preceeding process (optional)
+    #   ### Apply ICA (change ica_suff in config_sweep.py if necessary)
+    # {'N':   'F_AICA',                  # job name
     #  'Py':  'FPVS_Apply_ICA_sweep',          # Python script
     #  'Ss':  subjs,                    # subject indices
     #  'mem': '2G',                    # memory for qsub process
     #  'dep': 'F_CICA'},                      # name of preceeding process (optional)
 
 
-    # ### Get sweeps from raw data and average
+    # ## Get sweeps from raw data and average (change ica_suff in config_sweep.py if necessary)
     # {'N':   'F_GS',                  # job name
     #  'Py':  'FPVS_get_sweeps',          # Python script
     #  'Ss':  subjs,                    # subject indices
     #  'mem': '8G',                    # memory for qsub process
-    #  'dep': ''},
-    # ### Compute PSDs for averaged sweeps and plot
-    # {'N':   'F_PSD',                  # job name
-    #  'Py':  'FPVS_PSD_sweep',          # Python script
+    #  'dep': 'F_AICA'},
+
+    # ### Compute PSDs for averaged sweeps and plot (change ica_suff in config_sweep.py if necessary)
+    # {'N':   'F_P_C',                  # job name
+    #  'Py':  'FPVS_PSD_sweep_compute',          # Python script
     #  'Ss':  subjs,                    # subject indices
     #  'mem': '8G',                    # memory for qsub process
     #  'dep': 'F_GS'},
+    # ### Plot PSD results
+    # {'N':   'F_P_P',                  # job name
+    #  'Py':  'FPVS_PSD_sweep_plot',          # Python script
+    #  'Ss':  subjs,                    # subject indices
+    #  'mem': '8G',                    # memory for qsub process
+    #  'dep': 'F_P_C'},
 
-    # ### Rename triggers
-    # {'N':   'SR_RT',                  # job name
-    #  'Py':  'SR_rename_triggers',     # Python script
+    # ### Create Source Spaces
+    # {'N':   'FP_SP',                  # job name
+    #  'Py':  'FPVS_make_SourceSpace',          # Python script
     #  'Ss':  subjs,                    # subject indices
-    #  'mem': '4G',                    # memory for qsub process
-    #  'dep': 'SR_FR'},                      # name of preceeding process (optional)
-    # ### Perform ICA
-    # {'N':   'SR_ICA',                 # job name
-    #  'Py':  'SR_ICA_EOG',             # Python script
-    #  'Ss':  subjs,                    # subject indices
-    #  'mem': '12G',                    # memory for qsub process
-    #  'dep': 'SR_RT'},                      # name of preceeding process (optional)
-    # ## Apply ICA
-    # {'N':   'SR_AICA',                 # job name
-    #  'Py':  'SR_apply_ICA_EOG',             # Python script
-    #  'Ss':  subjs,                    # subject indices
-    #  'mem': '6G',                    # memory for qsub process
-    #  'dep': 'SR_ICA'},                      # name of preceeding process (optional)
-    # ### Epoch and average data
-    # {'N':   'SR_EPO',                 # job name
-    #  'Py':  'SR_Epoch',               # Python script
-    #  'Ss':  subjs,                    # subject indices
-    #  'mem': '16G',                    # memory for qsub process
-    #  'dep': ''},                      # name of preceeding process (optional)
-
-    # # CHECK
-    # # ### Epoch and average data - grating onset
-    # # {'N':   'SR_EPOS',                 # job name
-    # #  'Py':  'SR_Epoch_stim',               # Python script
-    # #  'Ss':  subjs,                    # subject indices
-    # #  'mem': '8G',                    # memory for qsub process
-    # #  'dep': 'SR_EPO'},                      # name of preceeding process (optional)
-
-    # ### compute TFR using wavelets
-    # {'N':   'SR_TFW',                 # job name
-    #  'Py':  'SR_TFR_Wavelet',         # Python script
-    #  'Ss':  subjs,                    # subject indices
-    #  'mem': '10G',                    # memory for qsub process
-    #  'dep': ''},                      # name of preceeding process (optional)
-    # # ### compute TFR using wavelets - grating onset
-    # {'N':   'SR_TFWS',                 # job name
-    #  'Py':  'SR_TFR_Wavelet_stim',         # Python script
-    #  'Ss':  subjs,                    # subject indices
-    #  'mem': '10G',                    # memory for qsub process
-    #  'dep': 'SR_EPOS'},                      # name of preceeding process (optional)
-    # ### Plot results from SR_TFR_Wavelet
-    # {'N':   'SR_PTFW',                  # job name
-    #  'Py':  'SR_Plot_TFR_Wavelet',      # Python script
-    #  'Ss':  subjs,                      # subject indices
-    #  'mem': '4G',                      # memory for qsub process
-    #  'dep': ''},                        # name of preceeding process (optional)
-    # #  ### Plot results from SR_TFR_Wavelet - grating onset
-    # {'N':   'SR_PTFWS',                  # job name
-    #  'Py':  'SR_Plot_TFR_Wavelet_stim',      # Python script
-    #  'Ss':  subjs,                      # subject indices
-    #  'mem': '4G',                      # memory for qsub process
-    #  'dep': 'SR_TFWS'}                        # name of preceeding process (optional)
+    #  'mem': '2G',                    # memory for qsub process
+    #  'dep': ''}                      # name of preceeding process (optional)
 ]
 
 ### Other processing steps
@@ -148,7 +127,6 @@ dir_py = op.join('/', 'home', 'olaf', 'MEG', 'FPVS', 'MNE-Python')
 # directory for qsub output
 dir_sbatch = op.join('/', 'home', 'olaf', 'MEG', 'FPVS', 'MNE-Python',
                      'sbatch_out')
-
 
 # keep track of qsub Job IDs
 Job_IDs = {}
