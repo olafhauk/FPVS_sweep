@@ -1,4 +1,4 @@
-#!/imaging/local/software/miniconda/envs/mne0.19/bin/python
+#!/imaging/local/software/miniconda/envs/mne0.20/bin/python
 """
 ==========================================
 Submit sbatch jobs for FPVS Frequency Sweep
@@ -14,6 +14,12 @@ then re-adapted by OH Jan 2020
 import subprocess
 from os import path as op
 
+from importlib import reload
+
+# import study parameters
+import config_sweep as config
+reload(config)
+
 print(__doc__)
 
 # wrapper to run python script via qsub. Python3
@@ -21,32 +27,16 @@ fname_wrap = op.join('/', 'home', 'olaf', 'MEG', 'FPVS', 'MNE-Python',
                      'Python2SLURM.sh')
 
 # indices of subjects to process
-# subjs = range(1,5)
-# EDIT
-# subjs = [1, 2]
-# subjs = [3, 4]
-# subjs = [1, 2, 3, 4, 5, 6, 7, 8, 9]
-# subjs = [10, 11, 12, 13, 14] # up to FR excpet 13
-# subjs = [15] 
-# subjs = [16] up to Maxfilter
-# subjs = [17]
-# subjs = [13] 
-# subjs = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14] # done GS and PSD -> missing 13
-# subjs = [13, 16, 17]
-# subjs = [1] # check how looks after changing channels
-# subjs = [1, 13, 15]
-subjs = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 15, 17, 18]
-# subjs = [8]
-
+subjs = config.do_subjs
 
 job_list = [
-    # Neuromag Maxfilter
-    {'N':   'F_MF',                  # job name
-     'Py':  'FPVS_Maxfilter_sweep',  # Python script
-     'Ss':  subjs,                    # subject indices
-     'mem': '16G',                   # memory for qsub process
-     'dep': '',                       # name of preceeding process (optional)
-     'node': '--constraint=maxfilter'},  # node constraint for MF, just picked one
+    # # Neuromag Maxfilter
+    # {'N':   'F_MF',                  # job name
+    #  'Py':  'FPVS_Maxfilter_sweep',  # Python script
+    #  'Ss':  subjs,                    # subject indices
+    #  'mem': '16G',                   # memory for qsub process
+    #  'dep': '',                       # name of preceeding process (optional)
+    #  'node': '--constraint=maxfilter'},  # node constraint for MF, just picked one
 
     # # fix EEG electrode positions in fiff-files
     # # NOTE: Can get "Permission denied"; should be run separately
@@ -74,7 +64,7 @@ job_list = [
     # {'N':   'F_CICA',                  # job name
     #  'Py':  'FPVS_Compute_ICA_sweep',          # Python script
     #  'Ss':  subjs,                    # subject indices
-    #  'mem': '32G',                    # memory for qsub process
+    #  'mem': '64G',                    # memory for qsub process
     #  'dep': 'F_FR'},                      # name of preceeding process (optional)
     #   ### Apply ICA (change ica_suff in config_sweep.py if necessary)
     # {'N':   'F_AICA',                  # job name
@@ -89,14 +79,20 @@ job_list = [
     #  'Py':  'FPVS_get_sweeps',          # Python script
     #  'Ss':  subjs,                    # subject indices
     #  'mem': '8G',                    # memory for qsub process
-    #  'dep': 'F_AICA'},
+    #  'dep': ''},
+    # ### Get epochs from sweeps for ERP analysis
+    # {'N':   'F_EPO',                  # job name
+    #  'Py':  'FPVS_epoch_sweeps',          # Python script
+    #  'Ss':  subjs,                    # subject indices
+    #  'mem': '8G',                    # memory for qsub process
+    #  'dep': ''},
 
     # ### Compute PSDs for averaged sweeps and plot (change ica_suff in config_sweep.py if necessary)
     # {'N':   'F_P_C',                  # job name
     #  'Py':  'FPVS_PSD_sweep_compute',          # Python script
     #  'Ss':  subjs,                    # subject indices
-    #  'mem': '8G',                    # memory for qsub process
-    #  'dep': 'F_GS'},
+    #  'mem': '32G',                    # memory for qsub process
+    #  'dep': ''},
     # ### Plot PSD results
     # {'N':   'F_P_P',                  # job name
     #  'Py':  'FPVS_PSD_sweep_plot',          # Python script
@@ -104,12 +100,75 @@ job_list = [
     #  'mem': '8G',                    # memory for qsub process
     #  'dep': 'F_P_C'},
 
+    # ### Morph source estimates before averaging
+    # {'N':   'F_Mph',                  # job name
+    #  'Py':  'FPVS_MorphSTC',          # Python script
+    #  'Ss':  subjs,                    # subject indices
+    #  'mem': '2G',                    # memory for qsub process
+    #  'dep': 'F_P_C'},
+
+    ### Compute Grand-Mean (only for 1 "subject")
+    # cannot be dependent on previous scripts, because they would
+    # have to complete for all participants
+    {'N':   'F_GM',                  # job name
+     'Py':  'FPVS_GrandAverage_PSDs',          # Python script
+     'Ss':  [99],                    # subject indices
+     'mem': '1G',                    # memory for qsub process
+     'dep': ''},
+    ### Plot Grand-Mean (only for 1 "subject")
+    {'N':   'F_GMP',                  # job name
+     'Py':  'FPVS_GrandAverage_Plot',          # Python script
+     'Ss':  [99],                    # subject indices
+     'mem': '1G',                    # memory for qsub process
+     'dep': 'F_GM'},
+
+    #  ### Create BEM surfaces and model
+    # {'N':   'F_Cov',                  # job name
+    #  'Py':  'FPVS_make_covmat',          # Python script
+    #  'Ss':  subjs,                    # subject indices
+    #  'mem': '4G',                    # memory for qsub process
+    #  'dep': ''},
+
     # ### Create Source Spaces
-    # {'N':   'FP_SP',                  # job name
+    # {'N':   'F_SS',                  # job name
     #  'Py':  'FPVS_make_SourceSpace',          # Python script
     #  'Ss':  subjs,                    # subject indices
     #  'mem': '2G',                    # memory for qsub process
-    #  'dep': ''}                      # name of preceeding process (optional)
+    #  'dep': ''},                      # name of preceeding process (optional)
+
+    # # ### Create BEM surfaces and model
+    # # # doesn't work - problem with overwrite
+    # # # do manually from terminal window
+    # # {'N':   'F_WS',                  # job name
+    # #  'Py':  'FPVS_make_watershed',          # Python script
+    # #  'Ss':  subjs,                    # subject indices
+    # #  'mem': '2G',                    # memory for qsub process
+    # #  'dep': 'F_SS'}                      # name of preceeding process (optional)
+
+    #  ### Create BEM surfaces and model
+    # {'N':   'F_BEM',                  # job name
+    #  'Py':  'FPVS_make_BEM',          # Python script
+    #  'Ss':  subjs,                    # subject indices
+    #  'mem': '2G',                    # memory for qsub process
+    #  'dep': ''},                      # name of preceeding process (optional)
+    # #  ### Create Forward Solution
+    # {'N':   'F_Fwd',                  # job name
+    #  'Py':  'FPVS_ForwardSolution',          # Python script
+    #  'Ss':  subjs,                    # subject indices
+    #  'mem': '2G',                    # memory for qsub process
+    #  'dep': ''},
+    #  ### Create Inverse Operator
+    # {'N':   'F_InvOp',                  # job name
+    #  'Py':  'FPVS_InverseOperator',          # Python script
+    #  'Ss':  subjs,                    # subject indices
+    #  'mem': '2G',                    # memory for qsub process
+    #  'dep': 'F_Fwd'},
+    #  ### Create Inverse Operator
+    # {'N':   'F_SM',                  # job name
+    #  'Py':  'FPVS_SensitivityMaps',          # Python script
+    #  'Ss':  subjs,                    # subject indices
+    #  'mem': '2G',                    # memory for qsub process
+    #  'dep': ''},
 ]
 
 ### Other processing steps
@@ -137,7 +196,7 @@ for job in job_list:
 
         Ss = str(Ss)  # turn into string for filenames etc.
 
-        N = Ss + job['N'] # add number to front
+        N = Ss + job['N']  # add number to front
         Py = op.join(dir_py, job['Py'])
         Cf = ''  # config file not necessary for FPVS
         mem = job['mem']

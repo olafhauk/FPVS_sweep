@@ -1,15 +1,15 @@
 #!/imaging/local/software/miniconda/envs/mne0.20/bin/python
 """
-Get data segments for individual frequency sweeps for FPVS Frequency Sweep.
+Epoch data segments from FPVS sweeps for ERP analysis.
 
 Read raw data, find runs, segment into individual frequency sweeps,
-average sweeps across runs, write the average as raw file
-(and ascii file if desired).
-Compute TFR if specified.
-Needs event file from filtering step.
+create and save epochs.
+Based on FPVS_get_sweeps.py (still has redundant functions)
 ==========================================
 
-OH, October 2019
+TO DO: add epoching for ERP analysis
+
+OH, May 2020
 """
 
 import sys
@@ -29,24 +29,9 @@ reload(config)
 
 print(mne.__version__)
 
-# perform TFR of raw data or not - outdated
-do_tfr = config.do_tfr
 
-close_fig = 1  # close figures only if close_fig==1
-
-ascii_eeg_edf = 0  # !=0 if EEG also output as ascii and edf files
-
-# Code to save in EDF format
-# https://gist.github.com/skjerns/bc660ef59dca0dbd53f00ed38c42f6be
-if ascii_eeg_edf:
-
-    from save_edf import write_edf
-
-# plt.ion() # interactive plotting
-
-
-def run_get_sweeps(sbj_id):
-    """Compute spectra for one subject."""
+def run_epoch_sweeps(sbj_id):
+    """Compute epochs for one subject."""
     # path to subject's data
     sbj_path = op.join(config.data_path, config.map_subjects[sbj_id][0])
 
@@ -64,21 +49,21 @@ def run_get_sweeps(sbj_id):
     names = np.unique(names)
 
     # initialise for data at different sweep frequencies
-    data_runs = {}
+    epochs = {}
     for name in names:
 
-        data_runs[name] = {}
+        epochs[name] = {}
 
         if name == 'face':
 
             # faces only have one frequency
-            data_runs[name]['6.0'] = []
+            epochs[name]['6.0'] = []
 
         else:
 
             for freq in config.fpvs_freqs:
 
-                data_runs[name][str(freq)] = []
+                epochs[name][str(freq)] = []
 
     # Note: Skip first two files since they are rest, no events
     for raw_stem_in in sss_map_fname[1][2:]:
@@ -89,6 +74,14 @@ def run_get_sweeps(sbj_id):
 
         print('\n###\nReading raw file %s.' % raw_fname_in)
         raw_ori = mne.io.read_raw_fif(raw_fname_in, preload=True)
+
+        # Filter for ERP analysis
+        # low-pass only, high-pass filter was applied earlier
+        raw_ori.filter(
+            l_freq=None, h_freq=40., method='fir', fir_design='firwin',
+            filter_length='auto', h_trans_bandwidth='auto')
+
+        ### EDIT: Add Notch filter here
 
         raw = deepcopy(raw_ori)  # keep raw_ori for possible TFR analysis
 
@@ -129,6 +122,8 @@ def run_get_sweeps(sbj_id):
             # note: samples don't start at 0, but times do
             onset_time = (events[idx, 0] - raw.first_samp) / raw.info['sfreq'] + 1.
 
+            # TO DO: the following bit can be streamlined
+
             if raw_stem_in[:4] == 'face':  # faces don't have "sweeps"
 
                 # just get one "sweep"
@@ -136,8 +131,17 @@ def run_get_sweeps(sbj_id):
                                                 sweep_duration=60.,
                                                 n_sweeps=1)
 
-                # for faces use whole run
-                data_runs[raw_stem_in[:4]]['6.0'].append(raw_sweep[0])
+                # Epoching for ERP analysis
+                print('###\nEpoching.')
+                event_id = 4  # onset of individual stimuli
+                epos = mne.Epochs(
+                    raw=raw_sweep[0], events=events, event_id=event_id,
+                    tmin=config.epo_t1, tmax=config.epo_t2, proj=True,
+                    baseline=config.epo_baseline, preload=True,
+                    reject=config.epo_reject)
+
+                # append for each run and frequency
+                epochs[raw_stem_in[:4]]['6.0'].append(epos)
 
             else:  # for frequency sweeps
 
@@ -154,52 +158,36 @@ def run_get_sweeps(sbj_id):
 
                 for [fi, ff] in enumerate(config.fpvs_freqs):
 
-                    data_runs[raw_stem_in[:4]][str(ff)].append(raw_sweeps[fi])
+                    # Epoching for ERP analysis
+                    print('###\nEpoching.')
+                    event_id = 4  # onset of individual stimuli
+                    epos = mne.Epochs(
+                        raw=raw_sweeps[fi], events=events, event_id=event_id,
+                        tmin=config.epo_t1, tmax=config.epo_t2, proj=True,
+                        baseline=config.epo_baseline, preload=True,
+                        reject=config.epo_reject)
+
+                    # append for each run and frequency
+                    epochs[raw_stem_in[:4]][str(ff)].append(epos)
+
 
     # AVERAGE raw files per condition and frequency across runs
     # write the result as raw fiff-file
-    for cond in data_runs.keys():  # conditions
+    for cond in epochs.keys():  # conditions
 
-        for freq in data_runs[cond].keys():  # frequencies
+        for freq in epochs[cond].keys():  # frequencies
 
-            # average sweeps across runs
-            raw_avg = average_raws(data_runs[cond][freq])
+            # concatenate epochs across runs
+            epochs_conc = mne.concatenate_epochs(epochs[cond][freq])
 
-            # remove dot from frequency string
-            fname = 'rawavg_%s_%s_%s.fif' % (cond, ''.join(freq.split('.')),
-                                             config.raw_ICA_suff)
+            epo_fname = op.join(
+                sbj_path, '%s_f_%s_%s_%s-epo.fif' %
+                (raw_stem_in[:4], config.raw_ICA_suff, cond,
+                 ''.join(freq.split('.'))))
 
-            fname_raw_out = op.join(sbj_path, fname)
+            print('Writing epochs to %s.' % epo_fname)
 
-            print('Writing average raw data to %s:' % fname_raw_out)
-
-            raw_avg.save(fname_raw_out, overwrite=True)
-
-            # if ascii and edf data for EEG requested as well
-            if ascii_eeg_edf:
-
-                # reduce to EEG only
-                raw_avg_eeg = raw_avg.pick_types(meg=False, eeg=True)
-
-                # ASCII
-                fname = 'rawavg_%s_%s_eeg.asc' % (cond,
-                                                  ''.join(freq.split('.')))
-                fname_asc_out = op.join(sbj_path, fname)
-
-                data_out = raw_avg_eeg.get_data()
-
-                print('Writing average ASCII data (%d, %d) to %s:'
-                      % (data_out.shape[0], data_out.shape[1], fname_asc_out))
-
-                np.savetxt(fname_asc_out, data_out)
-
-                # EDF
-                fname = 'rawavg_%s_%s_eeg.edf' % (cond, ''.join(freq.split('.')))
-                fname_edf_out = op.join(sbj_path, fname)
-
-                print('Writing average EDF data to %s:' % fname_edf_out)
-
-                write_edf(raw_avg_eeg, fname_edf_out, overwrite=True)
+            epochs_conc.save(epo_fname)
 
     return data_runs
 
@@ -341,4 +329,4 @@ else:
 for ss in sbj_ids:
 
     # raw, psds, psds_as_evo, freqs = run_PSD_raw(ss)
-    data_runs = run_get_sweeps(ss)
+    data_runs = run_epoch_sweeps(ss)

@@ -1,4 +1,4 @@
-#!/imaging/local/software/miniconda/envs/mne0.18/bin/python
+#!/imaging/local/software/miniconda/envs/mne0.20/bin/python
 """
 Compute ICA for FPVS Frequency Sweep.
 
@@ -52,9 +52,9 @@ class create_args:
     self.ECGthresh = 0.05
 
     self.ChanTypes = ['eeg', 'meg']
-    self.RejEEG = 1e-3
-    self.RejGrad = 4e-10
-    self.RejMag = 1e-11
+    self.RejEEG = config.reject['eeg']
+    self.RejGrad = config.reject['grad']
+    self.RejMag = config.reject['mag']
     self.n_pca_comps = '0.99'  # string required
     self.method = 'infomax'
 

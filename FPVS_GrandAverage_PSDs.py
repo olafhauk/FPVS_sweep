@@ -1,12 +1,24 @@
-
-#!/imaging/local/software/miniconda/envs/mne0.19/bin/python
+#!/imaging/local/software/miniconda/envs/mne0.20/bin/python
 """
 Compute grand-average of the outputs of FPVS_PSD_sweep.py.
 
+In order to average across all subjects, don't specify arguments, or specify
+a number larger than the largest subject ID (e.g. using using SLURM).
+For example:
+run FPVS_GrandAverage_PSDs
+run FPVS_GrandAverage_PSDs 1 2 3 4
+run FPVS_GrandAverage_PSDs 99
 ==========================================
 
 OH, February 2020
 """
+
+# To do:
+# data are not in format for easy averaging across subjects
+# then plotting needs changes accordingly
+
+# for Evoked data are in one file for all frequencies
+# for STC data are in separate files per condition and freq
 
 import sys
 
@@ -22,6 +34,12 @@ from importlib import reload
 
 import mne
 from mne.report import Report
+from mne.source_estimate import SourceEstimate
+
+import FPVS_functions
+reload(FPVS_functions)
+
+from FPVS_functions import grand_average_evoked_arrays
 
 import config_sweep as config
 reload(config)
@@ -52,12 +70,38 @@ unit_scalings = dict(eeg=1., mag=1., grad=1.)
 # Base frequencies for frequency sweep for words (not faces)
 freqs_all = [str(ff) for ff in config.fpvs_freqs]
 
+# separate filename prefixes for ICAed and non-ICAed data
+prefix = ''
+if 'ica' in config.raw_ICA_suff:
+    prefix = 'ICA'
+
+# Which modalities and results to process
+
+# all psd results for evoked and STC
+# individual subjects and GM
+modals = ['evo', 'stc']
+gm_modals = ['evo_gm', 'stc_gm']
+# modals = ['stc']
+# gm_modals = ['stc_gm']
+
+types = ['psd', 'psd_z', 'psd_sum_odd', 'psd_sum_base', 'psd_harm_odd',
+         'psd_harm_base', 'psd_harm_topos_odd', 'psd_harm_topos_base']
+
+# only for evoked: data for peak channels per condition
+evo_types = [
+    'peak_odd', 'z_peak_odd', 'harm_odd_peak_odd', 'harm_base_peak_odd',
+    'peak_base', 'z_peak_base', 'harm_odd_peak_base', 'harm_base_peak_base',
+    'peak_harm_topos_odd', 'peak_harm_topos_base']
+
 
 def grand_average_psds(sbj_ids):
     """Grand-average PSDs and derivatives across sbj_ids."""
     # initialise html report for one subject
 
-    report = Report(subject='GM', title='FPVS PSDs GM')
+    print('Grand-averaging subjects:')
+    print(*sbj_ids)
+
+    # report = Report(subject='GM', title='FPVS PSDs GM')
 
     # get condition names and frequency names
     # assumed to be consistent across subjects
@@ -69,566 +113,492 @@ def grand_average_psds(sbj_ids):
 
     conds = np.unique(conds)
 
-    # evoked files as dicts per condition, then lists across subjects
-    psds_as_evo, psds_z_as_evo, sum_odd_as_evo, sum_base_as_evo,\
-        psd_harm_as_evo, psd_harm_base_as_evo = {}, {}, {}, {}, {}, {}
+    # initialise
 
-    # data for peak channels per condition, then lists across subjects
-    psds_data_peak, psds_z_data_peak, psd_harm_data_peak,\
-        psd_harm_base_data_peak = {}, {}, {}, {}
+    psds = {}  # individual subjects and GM
 
-    for cond in conds:  # conditions
+    do_modals = modals + gm_modals
 
-        print('###\nCondition: %s.\n###' % cond)
+    for modal in do_modals:
 
-        # create list of Evoked objects for all frequencies per condition
-        # GM will be computed as average across list items
-        psds_as_evo[cond], psds_z_as_evo[cond], sum_odd_as_evo[cond],\
-            sum_base_as_evo[cond], psd_harm_as_evo[cond],\
-            psd_harm_base_as_evo[cond] = [], [], [], [], [], []
+        print(modal)
 
-        # The same but for arrays with peak data
-        # for different channel groups
-        psds_data_peak[cond] = {'base': [], 'odd': []}
-        psds_z_data_peak[cond] = {'base': [], 'odd': []}
-        psd_harm_data_peak[cond] = {'base': [], 'odd': []}
-        psd_harm_base_data_peak[cond] = {'base': [], 'odd': []}
+        psds[modal] = {}  # type of data
 
-        if cond == 'face':  # no frequency sweep for faces
+        do_types = types
 
-            freqs = ['6.0']  # base frequency for this condition (Hz as string)
+        if modal == 'evo':  # add other types
 
-            freq_odd = 1.2  # oddball frequency for this condition (Hz)
+            do_types = do_types + evo_types
 
-        else:  # for all word condition, use all sweep frequencies
+        for tt in do_types:
 
-            # base frequencies for this condition (Hz as string)
-            freqs = freqs_all
+            psds[modal][tt] = {}  # type of processed PSD
 
-            freq_odd = 1.0  # oddball frequency the same for all sweeps
+            for cond in conds:
 
-        for sbj_id in sbj_ids:  # across all subjects, EDIT ###
+                psds[modal][tt][cond] = {}  # sweep frequencies
 
-            # path to subject's data
-            sbj_path = op.join(config.data_path,
-                               config.map_subjects[sbj_id][0])
+                if cond == 'face':  # no frequency sweep for faces
 
-            # Read Evoked objects for individual subjects:
+                    freqs = ['6.0']  # base frequency for this condition (Hz as string)
 
-            print('Reading PSD results from evoked files:')
+                else:  # for all word condition, use all sweep frequencies
 
-            # separate filename prefixes for ICAed and non-ICAed data
-            prefix = ''
-            if 'ica' in config.raw_ICA_suff:
-                prefix = 'ICA'
+                    # base frequencies for this condition (Hz as string)
+                    freqs = freqs_all
 
-            fname_evo = op.join(sbj_path, '%sPSDTopo_%s%s' % (prefix,
-                                                              cond, '-ave.fif'))
-            print(fname_evo)
-            psds_as_evo[cond].append(mne.read_evokeds(fname_evo))
+                for freq in freqs:
 
-            fname_evo = op.join(sbj_path, '%sPSDTopoZ_%s%s' % (prefix,
-                                                               cond,
-                                                               '-ave.fif'))
-            print(fname_evo)
-            psds_z_as_evo[cond].append(mne.read_evokeds(fname_evo))
+                    psds[modal][tt][cond][freq] = []  # subjects
 
-            fname_evo = op.join(sbj_path, '%sPSDHarm_%s%s' % (prefix,
-                                                              cond,
-                                                              '-ave.fif'))
-            print(fname_evo)
-            psd_harm_as_evo[cond].append(mne.read_evokeds(fname_evo))
+    # Reading evoked data, getting data for channel groups
+    if 'evo' in modals:
 
-            fname_evo = op.join(sbj_path, '%sPSDHarmBase_%s%s' % (prefix,
-                                                                  cond,
-                                                                  '-ave.fif'))
-            print(fname_evo)
-            psd_harm_base_as_evo[cond].append(mne.read_evokeds(fname_evo))
+        print('Reading evoked data.')
 
-            fname_evo = op.join(sbj_path, '%sPSDSumTopoOdd_%s%s' % (prefix,
-                                                                    cond,
-                                                                    '-ave.fif'))
-            print(fname_evo)
-            sum_odd_as_evo[cond].append(mne.read_evokeds(fname_evo))
+        modal = 'evo'
 
-            fname_evo = op.join(sbj_path, '%sPSDSumTopoBase_%s%s' % (prefix,
-                                                                     cond,
-                                                                     '-ave.fif'))
-            print(fname_evo)
-            sum_base_as_evo[cond].append(mne.read_evokeds(fname_evo))
+        for cond in conds:  # conditions
 
-            # check if there are as many evoked objects in list as their are
-            # sweep frequencies for this condition
-            if len(psds_as_evo[cond][-1]) != len(freqs):
+            print('Condition: %s.' % cond)
 
-                print('Number of evoked files (%d) and frequencies (%d) do '
-                      'not match!' % (len(psds_as_evo), len(freqs)))
-                return
+            if cond == 'face':  # no frequency sweep for faces
 
-            # get data for peak channels (may be different across subjects) for
-            # later grand-averaging
+                freqs = ['6.0']  # base frequency for condition (Hz as str)
 
-            # data for peak channels per condition
-            # dict for base and oddball frequeny, respectively
-            # create list across base frequencies, then append per subject
-            psds_tmp = {'base': [], 'odd': []}
-            psds_z_tmp = {'base': [], 'odd': []}
-            psd_harm_tmp = {'base': [], 'odd': []}
-            psd_harm_base_tmp = {'base': [], 'odd': []}
+                freq_odd = 1.2  # oddball frequency for this condition (Hz)
+
+            else:  # for all word condition, use all sweep frequencies
+
+                # base frequencies for this condition (Hz as string)
+                freqs = freqs_all
+
+                freq_odd = 1.0  # oddball frequency the same for all sweeps
+
+            # for Evoked data are in one file for all frequencies
+            # for STC data are in separate files per condition and freq
+            for sbj_id in sbj_ids:  # across all subjects, EDIT ###
+
+                # path to subject's data
+                sbj_path = op.join(config.data_path,
+                                   config.map_subjects[sbj_id][0])
+
+                print('Reading PSD results from evoked files:')
+
+                # Read Evoked
+
+                fname_evo =\
+                    op.join(sbj_path, 'AVE', '%sPSDTopo_%s%s' %
+                            (prefix, cond, '-ave.fif'))
+                print(fname_evo)
+                psd = mne.read_evokeds(fname_evo)
+
+                fname_evo =\
+                    op.join(sbj_path, 'AVE', '%sPSDTopoZ_%s%s' %
+                            (prefix, cond, '-ave.fif'))
+                print(fname_evo)
+                psd_z = mne.read_evokeds(fname_evo)
+
+                fname_evo =\
+                    op.join(sbj_path, 'AVE', '%sPSDHarm_%s%s' %
+                            (prefix, cond, '-ave.fif'))
+                print(fname_evo)
+                psd_harm_odd = mne.read_evokeds(fname_evo)
+
+                fname_evo = \
+                    op.join(sbj_path, 'AVE', '%sPSDHarmBase_%s%s' %
+                            (prefix, cond, '-ave.fif'))
+                print(fname_evo)
+                psd_harm_base = mne.read_evokeds(fname_evo)
+
+                fname_evo =\
+                    op.join(sbj_path, 'AVE', '%sPSDSumTopoOdd_%s%s' %
+                            (prefix, cond, '-ave.fif'))
+                print(fname_evo)
+                psd_sum_odd = mne.read_evokeds(fname_evo)
+
+                fname_evo =\
+                    op.join(sbj_path, 'AVE', '%sPSDSumTopoBase_%s%s' %
+                            (prefix, cond, '-ave.fif'))
+                print(fname_evo)
+                psd_sum_base = mne.read_evokeds(fname_evo)
+
+                fname_evo =\
+                    op.join(sbj_path, 'AVE', '%sPSDSumToposOdd_%s%s' %
+                            (prefix, cond, '-ave.fif'))
+                print(fname_evo)
+                psd_harm_topos_odd = mne.read_evokeds(fname_evo)
+
+                fname_evo =\
+                    op.join(sbj_path, 'AVE', '%sPSDSumToposBase_%s%s' %
+                            (prefix, cond, '-ave.fif'))
+                print(fname_evo)
+                psd_harm_topos_base = mne.read_evokeds(fname_evo)
+
+                for (fi, freq) in enumerate(freqs):
+
+                    print('Frequency: %s.' % freq)
+
+                    psds[modal]['psd'][cond][freq].append(psd[fi])
+
+                    psds[modal]['psd_z'][cond][freq].append(psd_z[fi])
+
+                    psds[modal]['psd_sum_odd'][cond][freq].append(psd_sum_odd[fi])
+
+                    psds[modal]['psd_sum_base'][cond][freq].append(psd_sum_base[fi])
+
+                    psds[modal]['psd_harm_topos_odd'][cond][freq].append(psd_harm_topos_odd[fi])
+
+                    psds[modal]['psd_harm_topos_base'][cond][freq].append(psd_harm_topos_base[fi])
+
+                    psds[modal]['psd_harm_odd'][cond][freq].append(psd_harm_odd[fi])
+
+                    psds[modal]['psd_harm_base'][cond][freq].append(psd_harm_base[fi])
+
+                    # hack, float-to-string-to-float-again
+                    # to be consistent with FPVS_PSD_sweep_plot.py
+                    basefreq = float(freq)
+
+                    # Get max channels from z-scored PSD at base frequency
+                    # not oddball frequency, which would be biased.
+                    # This evoked is for condition cond, current subject and
+                    # current frequency freq.
+                    evoked = deepcopy(psd_z[fi])
+
+                    # Find channels with maximum Z-scores per channel type
+                    # for base frequency
+                    # "Latency" is frequency in Hz divided by 1000
+                    peak_times_base = [basefreq]
+
+                    peak_ch_types_base = Ff.peak_channels_evoked(
+                        evoked=evoked, peak_times=peak_times_base,
+                        ch_types=None, n_chan=config.n_peak)
+
+                    print('###\nPeak channels in Z-scored PSD for base'
+                          'frequency %f: ' % basefreq)
+
+                    # turn channel names into one list
+                    # assume there was only one peak frequency
+                    peak_ch_names_base = []
+                    for chtype in peak_ch_types_base[0]:
+
+                        peak_ch_names_base = peak_ch_names_base + peak_ch_types_base[0][chtype]
+
+                    # Find channels with maximum Z-scores per channel type
+                    # for oddball frequency
+                    # "Latency" is frequency in Hz divided by 1000
+                    peak_times_odd = [freq_odd]
+                    peak_ch_types_odd = Ff.peak_channels_evoked(
+                        evoked=evoked, peak_times=peak_times_odd,
+                        ch_types=None, n_chan=config.n_peak)
+
+                    print('###\nPeak channels in Z-scored PSD for oddball frequency %f: '
+                          % freq_odd)
+
+                    # turn channel names into one list
+                    # assume there was only one peak frequency
+                    peak_ch_names_odd = []
+                    for chtype in peak_ch_types_odd[0]:
+
+                        peak_ch_names_odd = peak_ch_names_odd + peak_ch_types_odd[0][chtype]
+
+                    #
+
+                    # Deepcopy because instance of evoked will be modified.
+                    evoked = deepcopy(psd_z[fi])
+
+                    # reduce evoked to peak channels for base frequency
+                    evoked_peak = evoked.pick_channels(peak_ch_names_base)
+
+                    psds[modal]['z_peak_base'][cond][freq].append(
+                        evoked_peak)
+
+                    #
+
+                    # Deepcopy because instance of evoked will be modified.
+                    evoked = deepcopy(psd_z[fi])
+
+                    # reduce evoked to peak channels for oddball frequency
+                    evoked_peak = evoked.pick_channels(peak_ch_names_odd)
+
+                    psds[modal]['z_peak_odd'][cond][freq].append(
+                        evoked_peak)
+
+                    #
+
+                    evoked = deepcopy(psd[fi])
+
+                    # base freq
+                    evoked_peak = evoked.pick_channels(peak_ch_names_base)
+
+                    psds[modal]['peak_base'][cond][freq].append(
+                        evoked_peak)
+
+                    evoked = deepcopy(psd[fi])
+
+                    # odd freq
+                    evoked_peak = evoked.pick_channels(peak_ch_names_odd)
+
+                    psds[modal]['peak_odd'][cond][freq].append(
+                        evoked_peak)
+
+                    #
+
+                    evoked = deepcopy(psd_harm_odd[fi])
+
+                    # base freq
+                    evoked_peak = evoked.pick_channels(peak_ch_names_base)
+
+                    psds[modal]['harm_odd_peak_base'][cond][freq].append(
+                        evoked_peak)
+
+                    #
+
+                    evoked = deepcopy(psd_harm_odd[fi])
+
+                    # odd freq
+                    evoked_peak = evoked.pick_channels(peak_ch_names_odd)
+
+                    psds[modal]['harm_odd_peak_odd'][cond][freq].append(
+                        evoked_peak)
+
+                    #
+
+                    evoked = deepcopy(psd_harm_base[fi])
+
+                    # base freq
+                    evoked_peak = evoked.pick_channels(peak_ch_names_base)
+
+                    psds[modal]['harm_base_peak_base'][cond][freq].append(
+                        evoked_peak)
+
+                    #
+
+                    evoked = deepcopy(psd_harm_base[fi])
+
+                    # odd freq
+                    evoked_peak = evoked.pick_channels(peak_ch_names_odd)
+
+                    psds[modal]['harm_base_peak_odd'][cond][freq].append(
+                        evoked_peak)
+
+                    #
+
+                    evoked = deepcopy(psd_harm_topos_base[fi])
+
+                    # base freq
+                    evoked_peak = evoked.pick_channels(peak_ch_names_base)
+
+                    psds[modal]['peak_harm_topos_base'][cond][freq].append(
+                        evoked_peak)
+
+                    #
+
+                    evoked = deepcopy(psd_harm_topos_odd[fi])
+
+                    # base freq
+                    evoked_peak = evoked.pick_channels(peak_ch_names_odd)
+
+                    psds[modal]['peak_harm_topos_odd'][cond][freq].append(
+                        evoked_peak)
+
+    # Reading source estimate (STC) data
+    if 'stc' in modals:
+
+        print('Reading source estimates.')
+
+        modal = 'stc'
+
+        for cond in conds:  # conditions
+
+            print('Condition: %s.' % cond)
+
+            if cond == 'face':  # no frequency sweep for faces
+
+                freqs = ['6.0']  # base frequency for this condition (Hz, str)
+
+                freq_odd = 1.2  # oddball frequency for this condition (Hz)
+
+            else:  # for all word condition, use all sweep frequencies
+
+                # base frequencies for this condition (Hz as string)
+                freqs = freqs_all
+
+                freq_odd = 1.0  # oddball frequency the same for all sweeps
 
             for (fi, freq) in enumerate(freqs):
 
-                print('Frequency: %s.' % freq)
+                # for Evoked data are in one file for all frequencies
+                # for STC data are in separate files per condition and freq
+                for sbj_id in sbj_ids:  # across all subjects, EDIT ###
 
-                # hack, float-to-string-to-float-again
-                # to be consistent with FPVS_PSD_sweep_plot.py
-                basefreq = float(freq)
+                    # path to subject's data
+                    sbj_path = op.join(config.data_path,
+                                       config.map_subjects[sbj_id][0])
 
-                # Get max channels from z-scored PSD at base frequency
-                # not oddball frequency, which would be biased.
-                # This evoked is for condition cond, current subject -1 and
-                # current frequency freq.
-                evoked = deepcopy(psds_z_as_evo[cond][-1][fi])
+                    print('Reading PSD results from STC files:')
 
-                # Find channels with maximum Z-scores per channel type
-                # for base frequency
-                # "Latency" is frequency in Hz divided by 1000
-                peak_times_base = [basefreq]
-                peak_ch_types_base = Ff.peak_channels_evoked(evoked=evoked,
-                                                             peak_times=peak_times_base,
-                                                             ch_types=None,
-                                                             n_chan=config.n_peak)
+                    fname_stc = op.join(
+                        sbj_path, 'STC', '%sPSDTopo_%s_%s_mph-lh.stc' %
+                        (prefix, cond, freq)
+                    )
+                    print(fname_stc)
+                    stc = mne.read_source_estimate(fname_stc)
+                    psds[modal]['psd'][cond][freq].append(stc)
 
-                print('###\nPeak channels in Z-scored PSD for base frequency %f: '
-                      % basefreq)
+                    fname_stc = op.join(
+                        sbj_path, 'STC', '%sPSDTopoZ_%s_%s_mph-lh.stc' %
+                        (prefix, cond, freq)
+                    )
+                    print(fname_stc)
+                    stc = mne.read_source_estimate(fname_stc)
+                    psds[modal]['psd_z'][cond][freq].append(stc)
 
-                # turn channel names into one list
-                # assume there was only one peak frequency
-                peak_ch_names_base = []
-                for chtype in peak_ch_types_base[0]:
+                    fname_stc = op.join(
+                        sbj_path, 'STC', '%sPSDHarm_%s_%s_mph-lh.stc' %
+                        (prefix, cond, freq)
+                    )
+                    print(fname_stc)
+                    stc = mne.read_source_estimate(fname_stc)
+                    psds[modal]['psd_harm_odd'][cond][freq].append(stc)
 
-                    peak_ch_names_base = peak_ch_names_base + peak_ch_types_base[0][chtype]
+                    fname_stc = op.join(
+                        sbj_path, 'STC', '%sPSDHarmBase_%s_%s_mph-lh.stc' %
+                        (prefix, cond, freq)
+                    )
+                    print(fname_stc)
+                    stc = mne.read_source_estimate(fname_stc)
+                    psds[modal]['psd_harm_base'][cond][freq].append(stc)
 
-                # Find channels with maximum Z-scores per channel type
-                # for oddball frequency
-                # "Latency" is frequency in Hz divided by 1000
-                peak_times_odd = [freq_odd]
-                peak_ch_types_odd = Ff.peak_channels_evoked(evoked=evoked,
-                                                            peak_times=peak_times_odd,
-                                                            ch_types=None,
-                                                            n_chan=config.n_peak)
+                    fname_stc = op.join(
+                        sbj_path, 'STC', '%sPSDSumTopoOdd_%s_%s_mph-lh.stc' %
+                        (prefix, cond, freq)
+                    )
+                    print(fname_stc)
+                    stc = mne.read_source_estimate(fname_stc)
+                    psds[modal]['psd_sum_odd'][cond][freq].append(stc)
 
-                print('###\nPeak channels in Z-scored PSD for oddball frequency %f: '
-                      % freq_odd)
+                    fname_stc = op.join(
+                        sbj_path, 'STC', '%sPSDSumTopoBase_%s_%s_mph-lh.stc' %
+                        (prefix, cond, freq)
+                    )
+                    print(fname_stc)
+                    stc = mne.read_source_estimate(fname_stc)
+                    psds[modal]['psd_sum_base'][cond][freq].append(stc)
 
-                # turn channel names into one list
-                # assume there was only one peak frequency
-                peak_ch_names_odd = []
-                for chtype in peak_ch_types_odd[0]:
+                    fname_stc = op.join(
+                        sbj_path, 'STC', '%sPSDSumToposOdd_%s_%s_mph-lh.stc' %
+                        (prefix, cond, freq)
+                    )
+                    print(fname_stc)
+                    stc = mne.read_source_estimate(fname_stc)
+                    psds[modal]['psd_harm_topos_odd'][cond][freq].append(stc)
 
-                    peak_ch_names_odd = peak_ch_names_odd + peak_ch_types_odd[0][chtype]
+                    fname_stc = op.join(
+                        sbj_path, 'STC', '%sPSDSumToposBase_%s_%s_mph-lh.stc' %
+                        (prefix, cond, freq)
+                    )
+                    print(fname_stc)
+                    stc = mne.read_source_estimate(fname_stc)
+                    psds[modal]['psd_harm_topos_base'][cond][freq].append(stc)
 
-                # Deepcopy because instance of evoked will be modified.
-                evoked = deepcopy(psds_z_as_evo[cond][-1][fi])
+                # Grand-average STCs
 
-                # reduce evoked to peak channels for base frequency
-                evoked_peak = evoked.pick_channels(peak_ch_names_base)
+                print('Grand-averaging source estimates.')
 
-                # get data as array for peak channels
-                data_peak = evoked_peak.data
+                for tt in types:
 
-                psds_z_tmp['base'].append(data_peak)
+                    stcs = psds[modal][tt][cond][freq]
 
-                # Deepcopy because instance of evoked will be modified.
-                evoked = deepcopy(psds_z_as_evo[cond][-1][fi])
+                    avg_data = np.average([s.data for s in stcs], axis=0)
 
-                # reduce evoked to peak channels for oddball frequency
-                evoked_peak = evoked.pick_channels(peak_ch_names_odd)
+                    # turn average into source estimate object
+                    stc_avg = SourceEstimate(avg_data, stcs[0].vertices,
+                                             stcs[0].tmin, stcs[0].tstep)
 
-                # get data as array for peak channels
-                data_peak = evoked_peak.data
+                    fname_stc = op.join(config.grandmean_path, 'STC',
+                                        '%s_%s_%s_%s' % (prefix, tt, cond,
+                                                         freq))
 
-                psds_z_tmp['odd'].append(data_peak)
+                    print('Writing GM to %s.' % fname_stc)
 
-                #
+                    stc_avg.save(fname_stc)
 
-                evoked = deepcopy(psds_as_evo[cond][-1][fi])
-
-                # base freq
-                evoked_peak = evoked.pick_channels(peak_ch_names_base)
-
-                data_peak = evoked_peak.data
-
-                psds_tmp['base'].append(data_peak)
-
-                evoked = deepcopy(psds_as_evo[cond][-1][fi])
-
-                # odd freq
-                evoked_peak = evoked.pick_channels(peak_ch_names_odd)
-
-                data_peak = evoked_peak.data
-
-                psds_tmp['odd'].append(data_peak)
-
-                #
-
-                evoked = deepcopy(psd_harm_as_evo[cond][-1][fi])
-
-                # base freq
-                evoked_peak = evoked.pick_channels(peak_ch_names_base)
-
-                data_peak = evoked_peak.data
-
-                psd_harm_tmp['base'].append(data_peak)
-
-                evoked = deepcopy(psd_harm_as_evo[cond][-1][fi])
-
-                # odd freq
-                evoked_peak = evoked.pick_channels(peak_ch_names_odd)
-
-                data_peak = evoked_peak.data
-
-                psd_harm_tmp['odd'].append(data_peak)
-
-                #
-
-                evoked = deepcopy(psd_harm_base_as_evo[cond][-1][fi])
-
-                # base freq
-                evoked_peak = evoked.pick_channels(peak_ch_names_base)
-
-                data_peak = evoked_peak.data
-
-                psd_harm_base_tmp['base'].append(data_peak)
-
-                evoked = deepcopy(psd_harm_base_as_evo[cond][-1][fi])
-
-                # odd freq
-                evoked_peak = evoked.pick_channels(peak_ch_names_odd)
-
-                data_peak = evoked_peak.data
-
-                psd_harm_base_tmp['odd'].append(data_peak)
-
-            for cc in psds_tmp.keys():  # for channel groups
-
-                psds_data_peak[cond][cc].append(psds_tmp[cc])
-
-                psds_z_data_peak[cond][cc].append(psds_z_tmp[cc])
-
-                psd_harm_data_peak[cond][cc].append(psd_harm_tmp[cc])
-
-                psd_harm_base_data_peak[cond][cc].append(psd_harm_base_tmp[cc])
-
-    # GRAND-AVERAGE evoked data
-    print('Computing Grand Averages for %d participants.' %
-          len(psds_data_peak[cond]))
-
-    psds_as_evo_gm = grand_average_conditions_evo(psds_as_evo)
-
-    psds_z_as_evo_gm = grand_average_conditions_evo(psds_z_as_evo)
-
-    sum_odd_as_evo_gm = grand_average_conditions_evo(sum_odd_as_evo)
-
-    sum_base_as_evo_gm = grand_average_conditions_evo(sum_base_as_evo)
-
-    psd_harm_as_evo_gm = grand_average_conditions_evo(psd_harm_as_evo)
-
-    psd_harm_base_as_evo_gm =\
-        grand_average_conditions_evo(psd_harm_base_as_evo)
-
-    # GRAND-AVERAGE evoked data for peak channels
-    psds_as_evo_peak_gm = grand_average_conditions_data(psds_data_peak,
-                                                        psds_as_evo,
-                                                        peak_ch_names_base)
-
-    psds_z_as_evo_peak_gm = grand_average_conditions_data(psds_z_data_peak,
-                                                          psds_z_as_evo,
-                                                          peak_ch_names_base)
-
-    psd_harm_as_evo_peak_gm = grand_average_conditions_data(psd_harm_data_peak,
-                                                            psd_harm_as_evo,
-                                                            peak_ch_names_base)
-
-    psd_harm_base_as_evo_peak_gm =\
-        grand_average_conditions_data(psd_harm_base_data_peak,
-                                      psd_harm_base_as_evo,
-                                      peak_ch_names_base)
+    # Compute Grand-Averages
 
     # Path for grand-mean results
     sbj_path = config.grandmean_path
 
-    # output directory for figures
-    figs_path = op.join(sbj_path, figs_dir)
+    if 'evo_gm' in gm_modals:
 
-    # PLOTTING ################################################################
-    print('Plotting.')
+        print('Grand-averaging evoked data.')
 
-    chtypes = ['mag', 'grad', 'eeg']
+        psd_evo = psds['evo']
 
-    for cond in conds:
+        for cond in conds:  # conditions
 
-        print('Condition %s.' % cond)
+            print('###\nCondition: %s.\n###' % cond)
 
-        # Plot topographies for sum across harmonic for oddball and base
-        # frequencies
-        for (odd_str, base_str) in zip(sum_odd_as_evo_gm[cond],
-                                       sum_base_as_evo_gm[cond]):
+            if cond == 'face':  # no frequency sweep for faces
 
-            # topography for oddball frequency
-            evoked = sum_odd_as_evo_gm[cond][odd_str]
+                freqs = ['6.0']  # base frequency for condition (Hz as str)
 
-            # get base frequency as string
-            # remove possible '_' at beginning
-            freq = odd_str[-4:].lstrip()  # '12.0', '_3.0' etc.
+            else:  # for all word condition, use all sweep frequencies
 
-            if freq[0] == '_':
+                # base frequencies for this condition (Hz as string)
+                freqs = freqs_all
 
-                freq = freq[1:]  # remove '_'
+            for tt in types:
 
-            print('freqstr, freq: %s, %s' % (odd_str, freq))
+                gm_evos = []  # get Evokeds for frequencies as list
 
-            # Use base frequency as "latency" in topoplot
-            # Note: also for oddball frequency the "latency" is the base
-            # frequency, because that's our experimental manipulation
-            basefreq = float(freq)
-            times = [basefreq]
+                for freq in freqs:
 
-            # remove '.'
-            freq = ''.join(freq.split('.'))
+                    # grand-average across subjects
+                    evoked =\
+                        mne.grand_average(psd_evo[tt][cond][freq])
 
-            # label for condition and base frequency
-            label_str = '%s_%s' % (cond, freq)
+                    evoked.comment = freq  # will be used in plotting script
 
-            file_label = odd_str
+                    # to keep everything
+                    psds['evo_gm'][tt][cond][freq] = deepcopy(evoked)
 
-            # Filename stem for figure; channel type to be added later
-            fname_fig = op.join(figs_path, prefix + file_label)
+                    # to write list of Evoked
+                    gm_evos.append(evoked)
 
-            print('Creating figure %s.' % fname_fig)
+                fname_evo = op.join(sbj_path, 'AVE', 'GM_%s_%s-ave.fif' %
+                                    (tt, cond))
 
-            figs = Ff.plot_evo_topomap(evoked, times, chtypes, fname_fig)
+                print('Writing GM to %s.' % fname_evo)
 
-            for [fig, chtype] in zip(figs, chtypes):
+                mne.write_evokeds(fname=fname_evo, evoked=gm_evos)
 
-                    sec_label = evoked.comment
+            # the following cannot use grand_average() because channel
+            # names differ across subjects
+            # channel nambes can also differ across frequencies
+            # therefore separate files for frequencies
 
-                    report.add_figs_to_section(fig, sec_label,
-                                               section=sec_label, scale=1)
+            for tt in evo_types:
 
-            # topography for base frequency
-            evoked = sum_base_as_evo_gm[cond][base_str]
+                for freq in freqs:
 
-            file_label = base_str
+                    # Evokeds to average
+                    evokeds = psd_evo[tt][cond][freq]
 
-            # Filename stem for figure; channel type to be added later
-            fname_fig = op.join(figs_path, prefix + file_label)
+                    # grand-average across subjects
+                    evoked =\
+                        grand_average_evoked_arrays(evokeds)
 
-            print('Creating figure %s.' % fname_fig)
+                    fname_evo = op.join(
+                        sbj_path, 'AVE', 'GM_%s_%s_%s-ave.fif' %
+                        (tt, cond, freq))
 
-            figs = Ff.plot_evo_topomap(evoked, times, chtypes, fname_fig)
+                    print('Writing GM to %s.' % fname_evo)
 
-            for [fig, chtype] in zip(figs, chtypes):
+                    mne.write_evokeds(fname=fname_evo, evoked=evoked)
 
-                    sec_label = evoked.comment
-
-                    report.add_figs_to_section(fig, sec_label,
-                                               section=sec_label, scale=1)
-
-        # plot evoked spectra and topographies (plot_joint())
-        evo_list = [psds_as_evo_gm, psds_z_as_evo_gm]
-
-        for evo in evo_list:
-
-            for [fi, freqstr] in enumerate(evo[cond]):
-
-                print('Plot GM evoked for %s %s.' % (cond, freqstr))
-
-                evoked = evo[cond][freqstr]
-
-                file_label = prefix + freqstr
-
-                figs = Ff.plot_psd_as_evo(evoked, sbj_path, picks=None,
-                                          txt_label=file_label,
-                                          close_fig=close_fig,
-                                          scalings=unit_scalings)
-
-                for [fig, chtype] in zip(figs, chtypes):
-
-                    sec_label = evoked.comment
-
-                    report.add_figs_to_section(fig, sec_label,
-                                               section=sec_label, scale=1)
-
-                # plot spectra for EEG channel selections
-                for roi in config.electrode_ROIs:
-
-                    evoked_roi = deepcopy(evoked)
-
-                    ch_names = config.electrode_ROIs[roi]
-
-                    evoked_roi.pick_channels(ch_names)
-
-                    # CROP PSD for display
-                    evoked_roi.crop(tmin=config.crop_times[0],
-                                    tmax=config.crop_times[1])
-
-                    # Plot for peak channels without topographies
-                    fig = evoked_roi.plot(spatial_colors=True, picks=None,
-                                          scalings=unit_scalings, gfp=True)
-
-                    fname_fig = op.join(figs_path, prefix +
-                                        file_label + '_%s.pdf' % roi)
-
-                    print('Creating figure %s.' % fname_fig)
-
-                    fig.savefig(fname_fig)
-
-                    sec_label = evoked.comment + ' ' + roi
-
-                    report.add_figs_to_section(fig, sec_label,
-                                               section=sec_label, scale=1)
-
-                plt.close('all')
-
-
-        # plot evoked spectra for peak channels
-        evo_list = [psds_as_evo_peak_gm, psds_z_as_evo_peak_gm]
-
-        for evo in evo_list:
-
-            # channel groups
-            labels = evo[cond].keys()
-
-            for lab in labels:
-
-                for [fi, freqstr] in enumerate(evo[cond][lab]):
-
-                    print('Plot GM evoked for %s %s %s.' % (cond, lab, freqstr))
-
-                    evoked = evo[cond][lab][freqstr]
-
-                    # CROP PSD for display
-                    evoked.crop(tmin=config.crop_times[0],
-                                tmax=config.crop_times[1])
-
-                    # Plot for peak channels without topographies
-                    fig = evoked.plot(spatial_colors=True, picks=None,
-                                      scalings=unit_scalings, gfp=True)
-
-                    filename = freqstr + '_Peak' + lab + '.pdf'
-
-                    fname_fig = op.join(figs_path, filename)
-
-                    print('Creating figure %s.' % fname_fig)
-
-                    fig.savefig(fname_fig)
-
-                    sec_label = evoked.comment + ' Peak' + lab
-
-                    report.add_figs_to_section(fig, sec_label, section=sec_label,
-                                               scale=1)
-
-            plt.close('all')
-
-        # plot spectra around target frequencies
-        evo_list = [psd_harm_as_evo_gm, psd_harm_base_as_evo_gm]
-
-        for evo in evo_list:
-
-            for [fi, freqstr] in enumerate(evo[cond]):
-
-                print('Plot GM target frequencies for %s %s.' %
-                      (cond, freqstr))
-
-                evoked = evo[cond][freqstr]
-
-                file_label = freqstr
-
-                fig = evoked.plot(spatial_colors=True, picks=None,
-                                  scalings=unit_scalings, gfp=True)
-
-                fname_fig = op.join(figs_path, prefix + file_label + '.pdf')
-
-                print('Creating figure %s.' % fname_fig)
-
-                fig.savefig(fname_fig)
-
-                sec_label = evoked.comment
-
-                report.add_figs_to_section(fig, sec_label, section=sec_label,
-                                           scale=1)
-
-                # plot spectra for EEG channel selections
-                for roi in config.electrode_ROIs:
-
-                    evoked_roi = deepcopy(evoked)
-
-                    ch_names = config.electrode_ROIs[roi]
-
-                    evoked_roi.pick_channels(ch_names)
-
-                    # Plot for peak channels without topographies
-                    fig = evoked_roi.plot(spatial_colors=True, picks=None,
-                                          scalings=unit_scalings, gfp=True)
-
-                    fname_fig = op.join(figs_path, prefix + file_label +
-                                        '_%s.pdf' % roi)
-
-                    print('Creating figure %s.' % fname_fig)
-
-                    fig.savefig(fname_fig)
-
-                    sec_label = evoked.comment + ' ' + roi
-
-                    report.add_figs_to_section(fig, sec_label,
-                                               section=sec_label, scale=1)
-
-            plt.close('all')
-
-        # plot spectra around target frequencies for peak channels
-        evo_list = [psd_harm_as_evo_peak_gm, psd_harm_base_as_evo_peak_gm]
-
-        for evo in evo_list:
-
-            # channel groups
-            labels = evo[cond].keys()
-
-            for lab in labels:
-
-                for [fi, freqstr] in enumerate(evo[cond][lab]):
-
-                    print('Plot GM evoked for %s %s %s.' % (cond, lab, freqstr))
-
-                    evoked = evo[cond][lab][freqstr]
-
-                    # Plotting PSDs across harmonics
-                    fig = evoked.plot(spatial_colors=True, picks=None,
-                                      scalings=unit_scalings, gfp=True)
-
-                    filename = prefix + freqstr + '_Peak' + lab + '.pdf'
-
-                    fname_fig = op.join(figs_path, filename)
-
-                    print('Creating figure %s.' % fname_fig)
-
-                    fig.savefig(fname_fig)
-
-                    sec_label = evoked.comment + ' Peak' + lab
-                    report.add_figs_to_section(fig, sec_label,
-                                               section=sec_label, scale=1)
-
-                plt.close('all')
-
-    # Save HTML report
-    fname_report = op.join(figs_path, prefix + 'GM_report.html')
-
-    report.save(fname_report, overwrite=True, open_browser=False)
-
-    plt.close('all')
-
-    return psds_as_evo_gm, psds_z_as_evo_gm, sum_odd_as_evo_gm,\
-        sum_base_as_evo_gm, psd_harm_as_evo_gm, psd_harm_base_as_evo_gm
+    return
 
 
 def grand_average_conditions_data(data, evokeds, ch_names):
@@ -773,9 +743,12 @@ def grand_average_conditions_evo(evos):
 
 
 # get all input arguments except first
-if len(sys.argv) == 1:
+# if number not in config list, do all of them
+if ((len(sys.argv) == 1) or
+   (int(sys.argv[1]) > np.max(list(config.map_subjects.keys())))):
 
-    sbj_ids = np.arange(0, len(config.map_subjects)) + 1
+    # IDs don't start at 0
+    sbj_ids = config.do_subjs
 
 else:
 
@@ -784,5 +757,4 @@ else:
 
 
 # requires all subjects to average across
-psds_as_evo, psds_z_as_evo, sum_odd_as_evo, sum_base_as_evo, psd_harm_as_evo,\
-    psd_harm_base_as_evo = grand_average_psds(sbj_ids)
+grand_average_psds(sbj_ids)

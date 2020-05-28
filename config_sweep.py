@@ -5,12 +5,23 @@ Config file for FPVS with Frequency Sweep
 """
 
 import os
+from os import path as op
+
 import sys
 
 import numpy as np
 
 ###############################################################################
-# paths to data.
+
+# IDs of subjects to process (SLURM and Grand-Average)
+do_subjs = [1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 16, 18]
+# do_subjs = [18]
+# removed:
+# 6: no MRI
+# 15: MEG artifacts due to titanium plate
+# 17: no MRI
+
+# paths to data:
 
 # path to acquired raw data
 cbu_path = '/megdata/cbu/fpvs'
@@ -23,6 +34,10 @@ subjects_dir = '/group/erp/data/olaf.hauk/MEG/FPVS/data_Federica/MRI'
 
 # for grand-mean results
 grandmean_path = '/group/erp/data/olaf.hauk/MEG/FPVS/data_Federica/GM'
+
+# for data exported to ASCII, Matlab etc.
+export_path = '/group/erp/data/olaf.hauk/MEG/FPVS/data_Federica/export'
+do_export = True  # whether to export raw spectra to Matlab or not
 
 if not os.path.isdir(data_path):  # create if necessary
     os.mkdir(data_path)
@@ -276,12 +291,12 @@ bad_channels = {
     1: {'eeg': ['EEG028'],
         'meg': ['MEG1123', 'MEG2223', 'MEG0813']},
     2: {'eeg': ['EEG041'],
-        'meg': ['MEG1123', 'MEG0093', 'MEG0813', 'MEG1412']},
+        'meg': ['MEG1123', 'MEG0813', 'MEG1412']},
     3: {'eeg': [],
         'meg': ['MEG2312', 'MEG2311', 'MEG0413']},
     4: {'eeg': ['EEG012', 'EEG074'],
         'meg': ['MEG0723', 'MEG1123', 'MEG0813']},
-    5: {'eeg': ['EEG029', 'EEG039',  'EEG050', 'EEG056', 'EEG071'], # also 'EEG049' is a bit noisy
+    5: {'eeg': ['EEG029', 'EEG039', 'EEG050', 'EEG056', 'EEG071'],  # also 'EEG049' is a bit noisy
         'meg': ['MEG1711', 'MEG2312', 'MEG0813', 'MEG2311']},
     6: {'eeg': ['EEG023', 'EEG040', 'EEG043'],
         'meg': ['MEG2323', 'MEG0813']},
@@ -290,7 +305,7 @@ bad_channels = {
     8: {'eeg': ['EEG004', 'EEG018', 'EEG029', 'EEG039', 'EEG050'],
         'meg': []},
     9: {'eeg': [],
-        'meg': ['MEG0813']},  
+        'meg': ['MEG0813']},
     10: {'eeg': [],
         'meg': ['MEG1131']},
     11: {'eeg': [],
@@ -299,41 +314,53 @@ bad_channels = {
         'meg': ['MEG0813']},
     13: {'eeg': ['EEG039', 'EEG050'],
         'meg': ['MEG1222']},
-    14: {'eeg': ['EEG032','EEG045','EEG047'],           # need to check how it looks with this channel interpolation
-        'meg': ['MEG2642', 'MEG0412', 'MEG1713', 'MEG2312', 'MEG2323']},  
+    14: {'eeg': ['EEG032', 'EEG045', 'EEG047'],           # need to check how it looks with this channel interpolation
+        'meg': ['MEG2642', 'MEG0412', 'MEG1713', 'MEG2312', 'MEG2323']},
     15: {'eeg': [],
-        'meg': ['MEG2511', 'MEG0813', 'MEG0933',]},
+        'meg': ['MEG2511', 'MEG0813', 'MEG0933']},
     16: {'eeg': ['EEG045'],
-        'meg': ['MEG1322', 'MEG2223']},     
-    17: {'eeg': ['EEG039','EEG048','EEG050','EEG055'],
-        'meg': ['MEG0813', 'MEG1712']},                        
-    18: {'eeg': ['EEG008','EEG021', 'EEG029','EEG045'],
-        'meg': ['MEG2323', 'MEG1943', 'MEG1741']},   
+        'meg': ['MEG1322', 'MEG2223']},
+    17: {'eeg': ['EEG039', 'EEG048', 'EEG050', 'EEG055'],
+        'meg': ['MEG0813', 'MEG1712']},
+    18: {'eeg': ['EEG008', 'EEG021', 'EEG029', 'EEG045'],
+        'meg': ['MEG2323', 'MEG1943', 'MEG1741']},
 
 }
 
 
 # create subject-specific data directories if necessary
 for ss in map_subjects:
-    subj_dir = os.path.join(data_path, map_subjects[ss][0])  # subject data dir
-    if not os.path.isdir(subj_dir):
+    # subject-specific sub-dir, e.g. maxfiltered raw data
+    subj_dir = op.join(data_path, map_subjects[ss][0])
+    if not op.isdir(subj_dir):
         print('Creating directory %s.' % subj_dir)
         os.mkdir(subj_dir)
-    fig_dir = os.path.join(data_path, map_subjects[ss][0], 'Figures')  # subject figure dir
-    if not os.path.isdir(fig_dir):
+    # subject-specific sub-dir for evoked data
+    subj_dir_ave = op.join(data_path, map_subjects[ss][0], 'AVE')
+    if not op.isdir(subj_dir_ave):
+        print('Creating directory %s.' % subj_dir_ave)
+        os.mkdir(subj_dir_ave)
+    # subject-specific sub-dir for source space data
+    subj_dir_stc = op.join(data_path, map_subjects[ss][0], 'STC')
+    if not op.isdir(subj_dir_stc):
+        print('Creating directory %s.' % subj_dir_stc)
+        os.mkdir(subj_dir_stc)
+    fig_dir = op.join(data_path, map_subjects[ss][0], 'Figures')  # subject figure dir
+    if not op.isdir(fig_dir):
         print('Creating directory %s.' % fig_dir)
         os.mkdir(fig_dir)
-    fig_dir = os.path.join(data_path, map_subjects[ss][0], 'Figures_ICA')  # subject figure dir
-    if not os.path.isdir(fig_dir):
+    fig_dir = op.join(data_path, map_subjects[ss][0], 'Figures_ICA')  # subject figure dir
+    if not op.isdir(fig_dir):
         print('Creating directory %s.' % fig_dir)
         os.mkdir(fig_dir)
 
-if not os.path.isdir(grandmean_path):
+if not op.isdir(grandmean_path):
     os.mkdir(grandmean_path)
-    os.mkdir(os.path.join(grandmean_path, 'Figures'))
-    os.mkdir(os.path.join(grandmean_path, 'Figures_ICA'))
-
-
+    os.mkdir(op.join(grandmean_path, 'Figures'))
+    os.mkdir(op.join(grandmean_path, 'Figures_ICA'))
+if not op.isdir(op.join(grandmean_path, 'AVE')):
+    os.mkdir(op.join(grandmean_path, 'AVE'))
+    os.mkdir(op.join(grandmean_path, 'STC'))
 
 # For subjects without clean ECG channel,
 # use the following magnetometers in ICA (else specify '' to use ECG)
@@ -358,9 +385,33 @@ ECG_channels = {
     18: ''
 }
 
+# Artefact rejection thresholds
+# for ICA, covariance matrix
+reject = dict(grad=4e-10, mag=1e-11, eeg=1e-3)
+
+###############################################################################
+# ERPs
+
+# artefact rejection thresholds for epoching
+epo_reject = dict(grad=4e-10, mag=1e-11, eeg=1e-3)
+
+# baseline in s
+epo_baseline = (-.2, 0.)
+
+# epoch interval in s
+epo_t1, epo_t2 = -.2, .5
 
 ###############################################################################
 # FPVS
+
+# resample to this sampling frequency before computing PSDs
+# only resample if not None
+psd_resample = None
+
+# window size of FFT
+# determined with mne.filter.next_fast_len()
+# chosen to match one sweep duration in the word conditions
+psd_nfft = 12000
 
 # time segment to remove at beginning of run (s)
 fpvs_leadin = 1.
@@ -403,13 +454,14 @@ psd_fmax = 140.
 
 # for plot_joint() display
 # These are actually frequencies in Hz, for PSD plots
-crop_times = [0.1, 13.]
+crop_times = [0.1, 30.]
 
 # number of neighbouring frequency bins to consider per side for SNR
-# baseline correction with psd_base_bins will be applied for z-score
+# baseline correction with psd_snr_bins will be applied for z-score
+# depends on frequency resolution
 psd_snr_bins = {}
-psd_snr_bins['faces'] = 30  # about 0.5 Hz
-psd_snr_bins['words'] = 6  # about 0.5 Hz
+psd_snr_bins['faces'] = 8  # about 0.8 Hz
+psd_snr_bins['words'] = 8  # about 0.8 Hz
 # number of neighbouring frequency bins (per side)
 # number of bins as "gap" between neighours (n_bins) and target frequency
 psd_n_gap = 1
@@ -420,10 +472,11 @@ n_peak = 4
 # Maxfilter etc.
 
 # parameters for Neuromag maxfilter command
+# Make sure to use Vectorview files!
 MF = {
      'NM_cmd': '/imaging/local/software/neuromag/bin/util/maxfilter-2.2.12',
-     'cal': '/neuro/databases/sss/sss_cal.dat',
-     'ctc': '/neuro/databases/ctc/ct_sparse.fif',
+     'cal': '/neuro/databases_vectorview/sss/sss_cal.dat',
+     'ctc': '/neuro/databases_vectorview/ctc/ct_sparse.fif',
      'st_duration': 10.,
      'st_correlation': 0.98,
      'origin': (0., 0., 0.045),
@@ -477,6 +530,7 @@ delay = 0.0345
 event_id = {}
 
 ### Source Space
+stc_morph = 'fsaverage'
 
 # vertex size
 src_spacing = 5

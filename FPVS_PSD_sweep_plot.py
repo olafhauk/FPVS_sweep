@@ -1,26 +1,38 @@
-#!/imaging/local/software/miniconda/envs/mne0.19/bin/python
+#!/imaging/local/software/miniconda/envs/mne0.20/bin/python
 """
 Plot results of FPVS Frequency Sweep, produced by FPVS_PSD_sweep_compute.py.
 
-Average raw data from FPVS_get_sweeps.py.
-Compute z-scores.
-Compute TFR if specified.
+Plots all conditions in sensor space, only face condition in source space.
 ==========================================
 
 OH, October 2019
+added source space April 2020
 """
 
 ### NOT DONE YETS
 
 import sys
 
+import os
 from os import path as op
-import numpy as np
 
-# import matplotlib
-# matplotlib.use('Agg') #  for running graphics on cluster ### EDIT
+os.environ['QT_QPA_PLATFORM'] = 'offscreen'
+
+import numpy as np
+import scipy.io  # for exporting to Matlab
+
+# os.environ['QT_QPA_PLATFORM'] = 'offscreen'
+
+# from mayavi import mlab
+# mlab.options.offscreen = True
+
+import matplotlib
+matplotlib.use('Agg') #  for running graphics on cluster ### EDIT
 
 from matplotlib import pyplot as plt
+
+from mayavi import mlab
+mlab.options.offscreen = True
 
 from importlib import reload
 
@@ -56,10 +68,13 @@ unit_scalings = dict(eeg=1., mag=1., grad=1.)
 print('Sunshine.')
 
 
-def run_PSD_raw(sbj_id):
+def run_PSD_plot(sbj_id):
     """Compute spectra for one subject."""
     # initialise html report for one subject
     report = Report(subject=str(sbj_id), title='FPVS PSDs')
+
+    # for STC plotting
+    subject = config.mri_subjects[sbj_id]
 
     # path to subject's data
     sbj_path = op.join(config.data_path, config.map_subjects[sbj_id][0])
@@ -91,6 +106,7 @@ def run_PSD_raw(sbj_id):
         sum_harms[cond] = {}
 
     # Go through conditions and frequencies
+    # EDIT
     for cond in conds:  # conditions
 
         # read Evoked objects for all frequencies per condition
@@ -101,33 +117,33 @@ def run_PSD_raw(sbj_id):
         if 'ica' in config.raw_ICA_suff:
             prefix = 'ICA'
 
-        fname_evo = op.join(sbj_path, '%sPSDTopo_%s%s' % (prefix, cond,
-                                                          '-ave.fif'))
+        fname_evo = op.join(sbj_path, 'AVE', '%sPSDTopo_%s%s' %
+                            (prefix, cond, '-ave.fif'))
         print(fname_evo)
         psds_as_evo = mne.read_evokeds(fname_evo)
 
-        fname_evo = op.join(sbj_path, '%sPSDTopoZ_%s%s' % (prefix, cond,
-                                                           '-ave.fif'))
+        fname_evo = op.join(sbj_path, 'AVE', '%sPSDTopoZ_%s%s' %
+                            (prefix, cond, '-ave.fif'))
         print(fname_evo)
         psds_z_as_evo = mne.read_evokeds(fname_evo)
 
-        fname_evo = op.join(sbj_path, '%sPSDHarm_%s%s' % (prefix, cond,
-                                                          '-ave.fif'))
+        fname_evo = op.join(sbj_path, 'AVE', '%sPSDHarm_%s%s' %
+                            (prefix, cond, '-ave.fif'))
         print(fname_evo)
         psd_harm_as_evo = mne.read_evokeds(fname_evo)
 
-        fname_evo = op.join(sbj_path, '%sPSDHarmBase_%s%s' % (prefix, cond,
-                                                              '-ave.fif'))
+        fname_evo = op.join(sbj_path, 'AVE', '%sPSDHarmBase_%s%s' %
+                            (prefix, cond, '-ave.fif'))
         print(fname_evo)
         psd_harm_base_as_evo = mne.read_evokeds(fname_evo)
 
-        fname_evo = op.join(sbj_path, '%sPSDSumTopoOdd_%s%s' % (prefix, cond,
-                                                                '-ave.fif'))
+        fname_evo = op.join(sbj_path, 'AVE', '%sPSDSumTopoOdd_%s%s' %
+                            (prefix, cond, '-ave.fif'))
         print(fname_evo)
         sum_odd_as_evo = mne.read_evokeds(fname_evo)
 
-        fname_evo = op.join(sbj_path, '%sPSDSumTopoBase_%s%s' % (prefix, cond,
-                                                                 '-ave.fif'))
+        fname_evo = op.join(sbj_path, 'AVE', '%sPSDSumTopoBase_%s%s' %
+                            (prefix, cond, '-ave.fif'))
         print(fname_evo)
         sum_base_as_evo = mne.read_evokeds(fname_evo)
 
@@ -170,10 +186,9 @@ def run_PSD_raw(sbj_id):
             # for base frequency
             # "Latency" is frequency in Hz divided by 1000
             peak_times_base = [basefreq]
-            peak_ch_types_base = Ff.peak_channels_evoked(evoked=evoked,
-                                                         peak_times=peak_times_base,
-                                                         ch_types=None,
-                                                         n_chan=config.n_peak)
+            peak_ch_types_base = Ff.peak_channels_evoked(
+                evoked=evoked, peak_times=peak_times_base, ch_types=None,
+                n_chan=config.n_peak)
 
             print('###\nPeak channels in Z-scored PSD for base frequency %f: '
                   % basefreq)
@@ -183,18 +198,18 @@ def run_PSD_raw(sbj_id):
             peak_ch_names_base = []
             for chtype in peak_ch_types_base[0]:
 
-                peak_ch_names_base = peak_ch_names_base + peak_ch_types_base[0][chtype]
+                peak_ch_names_base = peak_ch_names_base +\
+                    peak_ch_types_base[0][chtype]
 
             # Find channels with maximum Z-scores per channel type
             # for oddball frequency
             # "Latency" is frequency in Hz divided by 1000
             peak_times_odd = [freq_odd]
-            peak_ch_types_odd = Ff.peak_channels_evoked(evoked=evoked,
-                                                        peak_times=peak_times_odd,
-                                                        ch_types=None,
-                                                        n_chan=config.n_peak)
+            peak_ch_types_odd = Ff.peak_channels_evoked(
+                evoked=evoked, peak_times=peak_times_odd, ch_types=None,
+                n_chan=config.n_peak)
 
-            print('###\nPeak channels in Z-scored PSD for oddball frequency %f: '
+            print('\nPeak channels in Z-scored PSD for oddball frequency %f: '
                   % freq_odd)
 
             # turn channel names into one list
@@ -221,7 +236,8 @@ def run_PSD_raw(sbj_id):
             fig = evoked.plot(spatial_colors=True, picks=peak_ch_names_base,
                               scalings=unit_scalings, gfp=True, time_unit='s')
 
-            fname_fig = op.join(figs_path, 'PSDTopoZPeakbase_%s.pdf' % label_str)
+            fname_fig = op.join(figs_path, 'PSDTopoZPeakbase_%s.jpg' %
+                                label_str)
 
             fig.savefig(fname_fig)
 
@@ -232,7 +248,8 @@ def run_PSD_raw(sbj_id):
             fig = evoked.plot(spatial_colors=True, picks=peak_ch_names_odd,
                               scalings=unit_scalings, gfp=True, time_unit='s')
 
-            fname_fig = op.join(figs_path, 'PSDTopoZPeakodd_%s.pdf' % label_str)
+            fname_fig = op.join(figs_path, 'PSDTopoZPeakodd_%s.jpg' %
+                                label_str)
 
             fig.savefig(fname_fig)
 
@@ -248,7 +265,7 @@ def run_PSD_raw(sbj_id):
             fig = evoked.plot(spatial_colors=True, picks=peak_ch_names_base,
                               scalings=unit_scalings, gfp=True, time_unit='s')
 
-            fname_fig = op.join(figs_path, 'PSDHarmOddPeakbase_%s_%s.pdf'
+            fname_fig = op.join(figs_path, 'PSDHarmOddPeakbase_%s_%s.jpg'
                                 % (cond, freq))
 
             fig.savefig(fname_fig)
@@ -261,7 +278,7 @@ def run_PSD_raw(sbj_id):
             fig = evoked.plot(spatial_colors=True, picks=peak_ch_names_odd,
                               scalings=unit_scalings, gfp=True, time_unit='s')
 
-            fname_fig = op.join(figs_path, 'PSDHarmOddPeakodd_%s_%s.pdf'
+            fname_fig = op.join(figs_path, 'PSDHarmOddPeakodd_%s_%s.jpg'
                                 % (cond, freq))
 
             fig.savefig(fname_fig)
@@ -274,6 +291,21 @@ def run_PSD_raw(sbj_id):
 
             # Plot PSD
             evoked = psds_as_evo[fi]
+
+            # Export the raw spectra to Matlab
+            if config.do_export:
+
+                export_mat = {'psd': evoked.data, 'freqs': evoked.times,
+                              'ch_names': evoked.ch_names}
+
+                fname = 'PSD_%s_%s_%s.mat' % (config.map_subjects[sbj_id][0][-3:],
+                                              cond, freq[:-2])
+
+                export_fname = op.join(config.export_path, fname)
+
+                print('Exporting to Matlab file %s.' % export_fname)
+
+                scipy.io.savemat(export_fname, export_mat)
 
             file_label = 'PSDTopo_%s' % label_str
 
@@ -292,7 +324,8 @@ def run_PSD_raw(sbj_id):
             fig = evoked.plot(spatial_colors=True, picks=peak_ch_names_base,
                               scalings=unit_scalings, gfp=True, time_unit='s')
 
-            fname_fig = op.join(figs_path, 'PSDTopoPeakbase_%s.pdf' % label_str)
+            fname_fig = op.join(figs_path, 'PSDTopoPeakbase_%s.jpg' %
+                                label_str)
 
             fig.savefig(fname_fig)
 
@@ -303,7 +336,7 @@ def run_PSD_raw(sbj_id):
             fig = evoked.plot(spatial_colors=True, picks=peak_ch_names_odd,
                               scalings=unit_scalings, gfp=True, time_unit='s')
 
-            fname_fig = op.join(figs_path, 'PSDTopoPeakodd_%s.pdf' % label_str)
+            fname_fig = op.join(figs_path, 'PSDTopoPeakodd_%s.jpg' % label_str)
 
             fig.savefig(fname_fig)
 
@@ -319,7 +352,7 @@ def run_PSD_raw(sbj_id):
             fig = evoked.plot(spatial_colors=True, picks=peak_ch_names_base,
                               scalings=unit_scalings, gfp=True, time_unit='s')
 
-            fname_fig = op.join(figs_path, 'PSDHarmBasePeakbase_%s_%s.pdf'
+            fname_fig = op.join(figs_path, 'PSDHarmBasePeakbase_%s_%s.jpg'
                                 % (cond, freq))
 
             fig.savefig(fname_fig)
@@ -335,10 +368,11 @@ def run_PSD_raw(sbj_id):
 
             # Note: also for oddball frequency the "latency" is the base
             # frequency, because that's our experimental manipulation
-            times = [basefreq]
+            times = [0.]
 
             # Filename stem for figure; channel type to be added later
-            fname_fig = op.join(figs_path, 'PSDSumTopoOdd_%s_%s' % (cond, freq))
+            fname_fig = op.join(figs_path, 'PSDSumTopoOdd_%s_%s' %
+                                (cond, freq))
 
             # For html report section label
             sec_label = evoked.comment
@@ -355,7 +389,7 @@ def run_PSD_raw(sbj_id):
             # Plot PSD topography across harmonics for base frequency
             evoked = sum_base_as_evo[fi]
 
-            times = [basefreq]
+            times = [0.]
 
             # Filename stem for figure; channel type to be added later
             fname_fig = op.join(figs_path, 'PSDSumTopoBase_%s_%s' % (cond, freq))
@@ -381,6 +415,61 @@ def run_PSD_raw(sbj_id):
         # In case someone was forgotten
         plt.close('all')
 
+    # Plot the following STC files
+    fstems_stc = ['%sPSDSumTopoBase_%s_%s%s',
+                  '%sPSDSumTopoOdd_%s_%s%s']
+
+    for fstem_stc in fstems_stc:
+
+        fname_stc = op.join(
+            sbj_path, 'STC', fstem_stc % (prefix, 'face', '6.0', '-lh.stc')
+        )
+
+        print('Reading source estimate from %s.' % fname_stc)
+        stc = mne.read_source_estimate(fname_stc)
+
+        time_label = 'face 6 Hz'
+
+        thresh = stc.data.max()
+
+        # get some round numbers for colour bar
+
+        if thresh < 10:
+
+            thresh = np.floor(thresh)
+
+        elif thresh < 50:
+
+            thresh = 5 * np.floor(thresh / 5.)
+
+        else:
+
+            thresh = 10 * np.floor(thresh / 10.)
+
+        for hemi in ['both']: #  ['lh', 'rh']:
+
+            for view in ['lat', 'ven']:
+
+                brain = stc.plot(
+                    subject=subject, initial_time=0.,
+                    time_label=time_label, subjects_dir=config.subjects_dir,
+                    clim=dict(kind='value', lims=[0, thresh / 2., thresh]),
+                    hemi=hemi, views=view
+                )
+
+                fname_fig = op.join(
+                    figs_path,
+                    fstem_stc %
+                        (prefix, 'face', '6.0', '_STC_%s_%s.jpg' %
+                            (hemi, view))
+                )
+
+                print('Saving figure to %s.' % fname_fig)
+
+                mlab.savefig(fname_fig)
+
+    mlab.close(all=True)
+
     return
 
 
@@ -398,4 +487,4 @@ else:
 for ss in sbj_ids:
 
     # raw, psds, psds_as_evo, freqs = run_PSD_raw(ss)
-    run_PSD_raw(ss)
+    run_PSD_plot(ss)

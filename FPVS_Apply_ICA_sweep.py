@@ -1,4 +1,4 @@
-#!/imaging/local/software/miniconda/envs/mne0.18/bin/python
+#!/imaging/local/software/miniconda/envs/mne0.20/bin/python
 """
 Apply ICA for FPVS Frequency Sweep.
 

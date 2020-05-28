@@ -1,4 +1,4 @@
-#!/imaging/local/software/miniconda/envs/mne0.19/bin/python
+#!/imaging/local/software/miniconda/envs/mne0.20/bin/python
 """
 Maxfilter data from FPVS with Frequency Sweep.
 
@@ -81,6 +81,8 @@ def run_maxfilter(sbj_id):
                     -f %s \
                     -o %s \
                     -trans %s \
+                    -cal %s \
+                    -ctc %s \
                     -frame %s \
                     -regularize %s \
                     %s \
@@ -97,6 +99,8 @@ def run_maxfilter(sbj_id):
                        fname_in,
                        fname_out,
                        raw_fname_ref,
+                       MF['cal'],
+                       MF['ctc'],
                        MF['frame'],
                        MF['regularize'],
                        st_cmd,

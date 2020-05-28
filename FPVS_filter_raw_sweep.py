@@ -1,4 +1,4 @@
-#!/imaging/local/software/miniconda/envs/mne0.19/bin/python
+#!/imaging/local/software/miniconda/envs/mne0.20/bin/python
 """
 Filter and clean data from FPVS Frequency Sweep.
 

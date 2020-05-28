@@ -5,7 +5,7 @@
 
 # Runs mri_convert and recon-all to preprocess structural MRI data
 
-export FSVER='5.3.0'
+export FSVER='6.0.0'
 
 export FSDIR=${FSROOT}/${FSVER}
 

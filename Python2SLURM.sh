@@ -20,7 +20,7 @@ echo $SLURM_NODEID $SLURMD_NODENAME $SLURM_SUBMIT_HOST
 echo "Conda version:"
 conda --version
 
-conda activate mne0.19
+conda activate mne0.20
 
 # show path to conda environment
 echo "Conda environment:"
@@ -30,9 +30,15 @@ echo $CONDA_PREFIX
 echo "Python location:"
 which python
 
+setenv MESA_GL_VERSION_OVERRIDE 3.3
+
 # pycmd: python script to execute
 # subj_idx: subject index to be processed
 # var: variable string (e.g. for filenames)
 
-# /imaging/local/software/miniconda/envs/mne0.18/bin/python $pycmd $subj_idx
-python $pycmd $subj_idx
+# python $pycmd $subj_idx
+
+# from: https://docs.enthought.com/mayavi/mayavi/tips.html
+# also: https://patricksnape.github.io/2014/offscreen_rendering/
+echo "Using xvfb-run"
+xvfb-run -d --server-args="-screen 0 1024x768x24" python $pycmd $subj_idx
