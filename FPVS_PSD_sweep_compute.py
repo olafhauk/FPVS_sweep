@@ -22,6 +22,8 @@ import os
 # needed to run on SLURM
 os.environ['QT_QPA_PLATFORM'] = 'offscreen'
 
+from copy import deepcopy
+
 from mayavi import mlab
 mlab.options.offscreen = True
 
@@ -51,6 +53,11 @@ prefix = ''
 if 'ica' in config.raw_ICA_suff:
     prefix = 'ICA'
 
+freqs_all = [str(ff) for ff in config.fpvs_freqs]
+
+# conditions
+# conds = ['face', 'pwhf', 'pwlf', 'lfhf']
+conds = config.do_conds
 
 def run_PSD_raw(sbj_id):
     """Compute spectra for one subject."""
@@ -67,15 +74,13 @@ def run_PSD_raw(sbj_id):
     # raw-filename mappings for this subject
     sss_map_fname = config.sss_map_fnames[sbj_id]
 
-    # get condition names and frequency names
-    conds = []  # names of conditions
-    for raw_stem_in in sss_map_fname[1][2:]:
+    # # get condition names and frequency names
+    # conds = []  # names of conditions
+    # for raw_stem_in in sss_map_fname[1][2:]:
 
-        conds.append(raw_stem_in[:4])
+    #     conds.append(raw_stem_in[:4])
 
-    conds = np.unique(conds)
-
-    freqs_all = [str(ff) for ff in config.fpvs_freqs]
+    # conds = np.unique(conds)
 
     print('Frequencies used: ')
     print(freqs_all)
@@ -108,6 +113,10 @@ def run_PSD_raw(sbj_id):
 
             freqs = ['6.0']
 
+            # round to make sure combine_harmonics finds the right
+            # frequencies
+            oddfreq = round(config.fpvs_odd_freq['faces'], 2)
+
             # number of bins for z-scores
             snr_bins = config.psd_snr_bins['faces']
 
@@ -117,12 +126,16 @@ def run_PSD_raw(sbj_id):
 
             freqs = freqs_all
 
+            oddfreq = round(config.fpvs_odd_freq['words'], 2)
+
             # number of bins for z-scores
             snr_bins = config.psd_snr_bins['words']
 
             nave = 3  # for inverse
 
         for freq in freqs:  # frequencies
+
+            basefreq = float(freq)  # hack, float-to-string-to-float-again
 
             # initialise for this base frequency
             sum_harms_odd[cond][freq] = []
@@ -171,7 +184,7 @@ def run_PSD_raw(sbj_id):
             #                                                fmax=fmax,
             #                                                n_fft=n_fft)
 
-            print('Computing psd_welch() in source space.')
+            print('Computing psd_welch() in sensor and source space.')
             stc_psd, evo_psd = mne.minimum_norm.compute_source_psd(
                 raw=raw, inverse_operator=invop, lambda2=1 / 9., method='MNE',
                 fmin=fmin, fmax=fmax, n_fft=n_fft, overlap=.5,
@@ -218,17 +231,18 @@ def run_PSD_raw(sbj_id):
             psd_z = Ff.psd_z_score(evo_psd, snr_bins, mode='z',
                                    n_gap=config.psd_n_gap)
 
-            print('Computing Z-scores for STC.')
+            # The following not needed anywhere?
+            # print('Computing Z-scores for STC.')
 
-            psd_z_stc = Ff.psd_z_score(stc_psd, snr_bins, mode='z',
-                                       n_gap=config.psd_n_gap)
+            # psd_z_stc = Ff.psd_z_score(stc_psd, snr_bins, mode='z',
+            #                            n_gap=config.psd_n_gap)
 
-            psd_z_stc.subject = subject
+            # psd_z_stc.subject = subject
 
-            fname_stc = op.join(sbj_path, 'STC', '%sPSDTopoZ_%s_%s' %
-                                (prefix, cond, freq))
+            # fname_stc = op.join(sbj_path, 'STC', '%sPSDTopoZ_%s_%s' %
+            #                     (prefix, cond, freq))
 
-            psd_z_stc.save(fname_stc)
+            # psd_z_stc.save(fname_stc)
 
             # # z-scored PSDs as Evoked object
             # as_evo = mne.EvokedArray(psds_z, info,
@@ -241,85 +255,81 @@ def run_PSD_raw(sbj_id):
 
             # Compute the sum across harmonics of oddball frequency for this
             # condition and base frequency
-            if cond == 'face':
 
-                # round to make sure combine_harmonics finds the right
-                # frequencies
-                oddfreq = round(config.fpvs_odd_freq['faces'], 2)
+            # TO DO: first sum amplitudes, then compute z-score
+            # TO DO: summed topographies as z-scores should be taken from
+            # summed epochs, frequency 0
 
-            else:
+            # # summed topography across harmonics of oddball frequency
+            # print('Summing topographies for %d harmonics for oddball'
+            #       ' frequency.' % config.fpvs_n_harms_odd)
 
-                oddfreq = round(config.fpvs_odd_freq['words'], 2)
+            # # sum amplitudes
+            # sum_harms_odd[cond][freq], topos_evoked, freqs_harm =\
+            #     Ff.combine_harmonics_topos(
+            #         psd=evo_psd, freqs=psd_freqs, basefreq=basefreq,
+            #         oddfreq=oddfreq, n_harms=config.fpvs_n_harms_odd,
+            #         method='sum')
 
-            basefreq = float(freq)  # hack, float-to-string-to-float-again
+            # topos_evoked.comment = ' '.join(str(freqs_harm))
 
-            # summed topography across harmonics of oddball frequency
-            print('Summing topographies for %d harmonics for oddball'
-                  ' frequency.' % config.fpvs_n_harms_odd)
+            # topos_harms_odd[cond][freq] = topos_evoked
 
-            sum_harms_odd[cond][freq], topos_evoked, freqs_harm =\
-                Ff.combine_harmonics_topos(
-                    psd=psd_z, freqs=psd_freqs, basefreq=basefreq,
-                    oddfreq=oddfreq, n_harms=config.fpvs_n_harms_odd,
-                    method='sum')
+            # # sum amplitudes for STCs
+            # sum_harms_odd_stc, topos_harms_stc, freqs_harm =\
+            #     Ff.combine_harmonics_topos(
+            #         psd=stc_psd, freqs=psd_freqs, basefreq=basefreq,
+            #         oddfreq=oddfreq, n_harms=config.fpvs_n_harms_odd,
+            #         method='sum')
 
-            topos_evoked.comment = ' '.join(str(freqs_harm))
+            # sum_harms_odd_stc.subject = subject
+            # # hack to keep frequencies of harmonics
+            # topos_harms_stc.subject = ' '.join(str(freqs_harm))
 
-            topos_harms_odd[cond][freq] = topos_evoked
+            # fname_stc = op.join(sbj_path, 'STC', '%sPSDSumTopoOdd_%s_%s' %
+            #                     (prefix, cond, freq))
 
-            sum_harms_odd_stc, topos_harms_stc, freqs_harm =\
-                Ff.combine_harmonics_topos(
-                    psd=psd_z_stc, freqs=psd_freqs, basefreq=basefreq,
-                    oddfreq=oddfreq, n_harms=config.fpvs_n_harms_odd,
-                    method='sum')
+            # sum_harms_odd_stc.save(fname_stc)
 
-            sum_harms_odd_stc.subject = subject
-            # hack to keep frequencies of harmonics
-            topos_harms_stc.subject = ' '.join(str(freqs_harm))
+            # fname_stc = op.join(sbj_path, 'STC', '%sPSDSumToposOdd_%s_%s' %
+            #                     (prefix, cond, freq))
 
-            fname_stc = op.join(sbj_path, 'STC', '%sPSDSumTopoOdd_%s_%s' %
-                                (prefix, cond, freq))
+            # topos_harms_stc.save(fname_stc)
 
-            sum_harms_odd_stc.save(fname_stc)
+            # # summed topography across harmonics of base frequency
+            # print('Summing topographies for %d harmonics for base'
+            #       ' frequency.' % config.fpvs_n_harms_base)
 
-            fname_stc = op.join(sbj_path, 'STC', '%sPSDSumToposOdd_%s_%s' %
-                                (prefix, cond, freq))
+            # sum_harms_base[cond][freq], topos_evoked, freqs_harms =\
+            #     Ff.combine_harmonics_topos(
+            #         psd=evo_psd, freqs=psd_freqs, basefreq=None,
+            #         oddfreq=basefreq, n_harms=config.fpvs_n_harms_base,
+            #         method='sum')
 
-            topos_harms_stc.save(fname_stc)
+            # # hack to keep frequencies of harmonics
+            # topos_evoked.comment = ' '.join(str(freqs_harm))
 
-            # summed topography across harmonics of base frequency
-            print('Summing topographies for %d harmonics for base'
-                  ' frequency.' % config.fpvs_n_harms_base)
+            # topos_harms_base[cond][freq] = topos_evoked
 
-            sum_harms_base[cond][freq], topos_evoked, freqs_harms =\
-                Ff.combine_harmonics_topos(
-                    psd=psd_z, freqs=psd_freqs, basefreq=None,
-                    oddfreq=basefreq, n_harms=config.fpvs_n_harms_base,
-                    method='sum')
-            # hack to keep frequencies of harmonics
-            topos_evoked.comment = ' '.join(str(freqs_harm))
+            # sum_harms_base_stc, topos_harms_stc, freqs_harms =\
+            #     Ff.combine_harmonics_topos(
+            #         psd=stc_psd, freqs=psd_freqs, basefreq=None,
+            #         oddfreq=basefreq, n_harms=config.fpvs_n_harms_base,
+            #         method='sum')
 
-            topos_harms_base[cond][freq] = topos_evoked
+            # sum_harms_base_stc.subject = subject
+            # # hack to keep frequencies of harmonics
+            # topos_harms_stc.subject = ' '.join(str(freqs_harms))
 
-            sum_harms_base_stc, topos_harms_stc, freqs_harms =\
-                Ff.combine_harmonics_topos(
-                    psd=psd_z_stc, freqs=psd_freqs, basefreq=None,
-                    oddfreq=basefreq, n_harms=config.fpvs_n_harms_base,
-                    method='sum')
+            # fname_stc = op.join(sbj_path, 'STC', '%sPSDSumTopoBase_%s_%s' %
+            #                     (prefix, cond, freq))
 
-            sum_harms_base_stc.subject = subject
-            # hack to keep frequencies of harmonics
-            topos_harms_stc.subject = ' '.join(str(freqs_harms))
+            # sum_harms_base_stc.save(fname_stc)
 
-            fname_stc = op.join(sbj_path, 'STC', '%sPSDSumTopoBase_%s_%s' %
-                                (prefix, cond, freq))
+            # fname_stc = op.join(sbj_path, 'STC', '%sPSDSumToposBase_%s_%s' %
+            #                     (prefix, cond, freq))
 
-            sum_harms_base_stc.save(fname_stc)
-
-            fname_stc = op.join(sbj_path, 'STC', '%sPSDSumToposBase_%s_%s' %
-                                (prefix, cond, freq))
-
-            topos_harms_stc.save(fname_stc)
+            # topos_harms_stc.save(fname_stc)
 
             # # needs another dimension for Evoked object
             # to_evo_odd = np.expand_dims(sum_harms_odd[cond][freq], 1)
@@ -341,24 +351,51 @@ def run_PSD_raw(sbj_id):
             # sum_odd_as_evo.append(as_evo_odd)
             # sum_base_as_evo.append(as_evo_base)
 
-            sum_odd_as_evo.append(sum_harms_odd[cond][freq])
-            sum_base_as_evo.append(sum_harms_base[cond][freq])
-            topos_odd_as_evo.append(topos_harms_odd[cond][freq])
-            topos_base_as_evo.append(topos_harms_base[cond][freq])
+            # sum_odd_as_evo.append(sum_harms_odd[cond][freq])
+            # sum_base_as_evo.append(sum_harms_base[cond][freq])
+            # topos_odd_as_evo.append(topos_harms_odd[cond][freq])
+            # topos_base_as_evo.append(topos_harms_base[cond][freq])
 
             print('Summing PSDs across %d harmonics for oddball frequency' %
                   config.fpvs_n_harms_odd)
 
             # get PSDs around harmonics
-            psd_harm = Ff.psds_across_harmonics(
+            psd_harm, topo, topos, freqs_harm = Ff.psds_across_harmonics(
+                psd=evo_psd, freqs=psd_freqs, basefreq=basefreq,
+                oddfreq=oddfreq, n_harms=config.fpvs_n_harms_odd,
+                n_bins=snr_bins, n_gap=config.psd_n_gap, method='sum')
+
+            # get PSDs around harmonics for z-scores
+            # needed to get z-scored topographies for harmonics
+            psd_harm_z, topo_z, topos_z, freqs_harm_z = Ff.psds_across_harmonics(
                 psd=psd_z, freqs=psd_freqs, basefreq=basefreq,
                 oddfreq=oddfreq, n_harms=config.fpvs_n_harms_odd,
                 n_bins=snr_bins, n_gap=config.psd_n_gap, method='sum')
 
-            psd_harm_stc = Ff.psds_across_harmonics(
-                psd=psd_z_stc, freqs=psd_freqs, basefreq=basefreq,
+            # compute z-score after summing
+            psd_harm = Ff.psd_z_score(
+                psd_harm, snr_bins, mode='z', n_gap=config.psd_n_gap)
+
+            # Topography of z-scored summed harmonics at centre frequency
+            topo_evo = deepcopy(psd_harm)
+            topo_evo.crop(tmin=0., tmax=0.)
+            sum_harms_odd[cond][freq] = topo_evo
+
+            # z-scored topographies for individual harmonics
+            topos.comment = ' '.join(str(freqs_harm_z))
+
+            topos_harms_odd[cond][freq] = topos_z
+
+            # STCs odd
+
+            psd_harm_stc, topo, topos, freqs_harm = Ff.psds_across_harmonics(
+                psd=stc_psd, freqs=psd_freqs, basefreq=basefreq,
                 oddfreq=oddfreq, n_harms=config.fpvs_n_harms_odd,
                 n_bins=snr_bins, n_gap=config.psd_n_gap, method='sum')
+
+            # compute z-score after summing
+            psd_harm_stc = Ff.psd_z_score(
+                psd_harm_stc, snr_bins, mode='z', n_gap=config.psd_n_gap)
 
             psd_harm_stc.subject = subject
 
@@ -367,6 +404,30 @@ def run_PSD_raw(sbj_id):
 
             psd_harm_stc.save(fname_stc)
 
+            # MNE of z-scored summed harmonics at centre frequency
+            topo_stc = deepcopy(psd_harm_stc)
+            topo_stc.crop(tmin=0., tmax=0.)
+            sum_harms_odd_stc = topo_stc
+
+            sum_harms_odd_stc.subject = subject
+
+            # topographies for individual harmonics
+            topos_harms_stc = topos
+            # hack to keep frequencies of harmonics
+            topos_harms_stc.subject = ' '.join(str(freqs_harm))
+
+            fname_stc = op.join(sbj_path, 'STC', '%sPSDSumTopoOdd_%s_%s' %
+                                (prefix, cond, freq))
+
+            sum_harms_odd_stc.save(fname_stc)
+
+            fname_stc = op.join(sbj_path, 'STC', '%sPSDSumToposOdd_%s_%s' %
+                                (prefix, cond, freq))
+
+            topos_harms_stc.save(fname_stc)
+
+            # BASE FREQUENCY
+
             psd_harm.comment = 'PSDHarm_' + cond + '_' + freq
 
             print('Summing PSDs across %d harmonics for base frequency' %
@@ -374,15 +435,42 @@ def run_PSD_raw(sbj_id):
 
             # Sanity check - do it for base frequency
             # i.e. basefreq as oddfreq here, for all its harmonics
-            psd_harm_base = Ff.psds_across_harmonics(
+            psd_harm_base, topo, topos, freqs_harm = Ff.psds_across_harmonics(
+                psd=evo_psd, freqs=psd_freqs, basefreq=None, oddfreq=basefreq,
+                n_harms=config.fpvs_n_harms_base, n_bins=snr_bins,
+                n_gap=config.psd_n_gap, method='sum')
+
+            # sum across harmonics for z-scores
+            # needed to get z-scored topographies for harmonics
+            psd_harm_base_z, topo_z, topos_z, freqs_harm_z = Ff.psds_across_harmonics(
                 psd=psd_z, freqs=psd_freqs, basefreq=None, oddfreq=basefreq,
                 n_harms=config.fpvs_n_harms_base, n_bins=snr_bins,
                 n_gap=config.psd_n_gap, method='sum')
 
-            psd_harm_base_stc = Ff.psds_across_harmonics(
-                psd=psd_z_stc, freqs=psd_freqs, basefreq=None,
+            # compute z-score after summing
+            psd_harm_base = Ff.psd_z_score(
+                psd_harm_base, snr_bins, mode='z', n_gap=config.psd_n_gap)
+
+            # Topography of z-scored summed harmonics at centre frequency
+            topo_evo = deepcopy(psd_harm_base)
+            topo_evo.crop(tmin=0., tmax=0.)
+            sum_harms_base[cond][freq] = topo_evo
+
+            # z-scored topographies for individual harmonics
+            topos.comment = ' '.join(str(freqs_harm))
+
+            topos_harms_base[cond][freq] = topos_z
+
+            # STCs base
+
+            psd_harm_base_stc, topo, topos, freqs_harm = Ff.psds_across_harmonics(
+                psd=stc_psd, freqs=psd_freqs, basefreq=None,
                 oddfreq=basefreq, n_harms=config.fpvs_n_harms_base,
                 n_bins=snr_bins, n_gap=config.psd_n_gap, method='sum')
+
+            # compute z-score after summing
+            psd_harm_base_stc = Ff.psd_z_score(
+                psd_harm_base_stc, snr_bins, mode='z', n_gap=config.psd_n_gap)
 
             psd_harm_base_stc.subject = subject
 
@@ -392,6 +480,28 @@ def run_PSD_raw(sbj_id):
             psd_harm_base_stc.save(fname_stc)
 
             psd_harm_base.comment = 'PSDHarmBase_' + cond + '_' + freq
+
+            # MNE of z-scored summed harmonics at centre frequency
+            topo_stc = deepcopy(psd_harm_base_stc)
+            topo_stc.crop(tmin=0., tmax=0.)
+            sum_harms_base_stc = topo_stc
+
+            sum_harms_base_stc.subject = subject
+
+            # topographies for individual harmonics
+            topos_harms_stc = topos
+            # hack to keep frequencies of harmonics
+            topos_harms_stc.subject = ' '.join(str(freqs_harm))
+
+            fname_stc = op.join(sbj_path, 'STC', '%sPSDSumTopoBase_%s_%s' %
+                                (prefix, cond, freq))
+
+            sum_harms_base_stc.save(fname_stc)
+
+            fname_stc = op.join(sbj_path, 'STC', '%sPSDSumToposBase_%s_%s' %
+                                (prefix, cond, freq))
+
+            topos_harms_stc.save(fname_stc)
 
             # tmin = -(snr_bins + 1) * freq_resol  # include baseline
             # info['sfreq'] = 1. / freq_resol  # to display samples as time pts
@@ -408,6 +518,11 @@ def run_PSD_raw(sbj_id):
             psd_harm_as_evo.append(psd_harm)
 
             psd_harm_base_as_evo.append(psd_harm_base)
+
+            sum_odd_as_evo.append(sum_harms_odd[cond][freq])
+            sum_base_as_evo.append(sum_harms_base[cond][freq])
+            topos_odd_as_evo.append(topos_harms_odd[cond][freq])
+            topos_base_as_evo.append(topos_harms_base[cond][freq])
 
 
         # Save Evoked objects for later group stats:

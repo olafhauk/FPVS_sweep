@@ -80,6 +80,10 @@ avg_freqs = ['6.0', '4.0', '3.0']
 # output directory for figures
 figs_path = op.join(config.grandmean_path, figs_dir)
 
+# conditions
+# conds = ['face', 'pwhf', 'pwlf', 'lfhf']
+conds = config.do_conds
+
 def grand_average_plot():
     """Plot grand-average PSDs and derivatives."""
     # initialise html report for one subject
@@ -88,15 +92,15 @@ def grand_average_plot():
     # for STC plotting
     subject = 'fsaverage'
 
-    # get condition names and frequency names from first subject
-    # assumed to be consistent across subjects
-    sss_map_fname = config.sss_map_fnames[1]
-    conds = []  # names of conditions
-    for raw_stem_in in sss_map_fname[1][2:]:
+    # # get condition names and frequency names from first subject
+    # # assumed to be consistent across subjects
+    # sss_map_fname = config.sss_map_fnames[1]
+    # conds = []  # names of conditions
+    # for raw_stem_in in sss_map_fname[1][2:]:
 
-        conds.append(raw_stem_in[:4])
+    #     conds.append(raw_stem_in[:4])
 
-    conds = np.unique(conds)
+    # conds = np.unique(conds)
 
     # initialise
 
@@ -107,13 +111,27 @@ def grand_average_plot():
     # modals = ['stc']
     # gm_modals = ['stc_gm']
 
+    # types = ['psd', 'psd_z', 'psd_sum_odd', 'psd_sum_base', 'psd_harm_odd',
+    #          'psd_harm_base', 'psd_harm_topos_odd', 'psd_harm_topos_base']
+
+    # evo_types = [
+    #     'peak_odd', 'z_peak_odd', 'harm_odd_peak_odd', 'harm_base_peak_odd',
+    #     'peak_base', 'z_peak_base', 'harm_odd_peak_base',
+    #     'harm_base_peak_base', 'peak_harm_topos_odd', 'peak_harm_topos_base']
+
+    # for evoked
     types = ['psd', 'psd_z', 'psd_sum_odd', 'psd_sum_base', 'psd_harm_odd',
              'psd_harm_base', 'psd_harm_topos_odd', 'psd_harm_topos_base']
 
+    # only for evoked: data for peak channels per condition
     evo_types = [
-        'peak_odd', 'z_peak_odd', 'harm_odd_peak_odd', 'harm_base_peak_odd',
-        'peak_base', 'z_peak_base', 'harm_odd_peak_base',
+        'peak_odd', 'z_peak_odd', 'harm_odd_peak_odd',
+        'harm_base_peak_odd', 'peak_base', 'z_peak_base', 'harm_odd_peak_base',
         'harm_base_peak_base', 'peak_harm_topos_odd', 'peak_harm_topos_base']
+
+    # for STCs
+    stc_types = ['psd', 'psd_sum_odd', 'psd_sum_base', 'psd_harm_odd',
+                 'psd_harm_base', 'psd_harm_topos_odd', 'psd_harm_topos_base']
 
     psds = {}
 
@@ -232,7 +250,36 @@ def grand_average_plot():
         # PLOTTING ############################################################
         print('Plotting.')
 
-        chtypes = ['mag', 'grad', 'eeg']
+        chtypes = ['mag', 'grad', 'eeg']  # for some topo plots
+
+        # FOR FACES ONLY, put topographies for individual subjects together
+        fname_evo = op.join(
+            sbj_path, 'AVE', 'GM_sum_indiv_topos_%s_%s-ave.fif' %
+            ('face', '6.0'))
+
+        print('Reading evoked with topographies from %s.' % fname_evo)
+
+        evoked = mne.read_evokeds(fname_evo, 0)
+
+        for chtype in chtypes:
+
+            # scaling, with "threshold" for z-scores
+            vmin, vmax = 0., 10.
+
+            fig = evoked.plot_topomap(times=evoked.times, ch_type=chtype,
+                                      vmin=vmin, vmax=vmax,
+                                      scalings=unit_scalings[chtype],
+                                      units='Z', show=False)
+
+            fig_fname = op.join(
+                figs_path, 'GM_sum_indiv_topos_%s_%s_%s.jpg' %
+                ('face', '6.0', chtype))
+
+            print('Saving individual topographies to %s.' % fig_fname)
+
+            fig.savefig(fig_fname)
+
+        # Plotting everything else
 
         for cond in conds:
 
@@ -247,7 +294,7 @@ def grand_average_plot():
 
                 for freq in psds[modal][tt][cond]:
 
-                    # topography for oddball frequency
+                    # topography
                     evoked = psds[modal][tt][cond][freq]
 
                     print('freq: %s' % str(freq))
@@ -275,7 +322,6 @@ def grand_average_plot():
                         report.add_figs_to_section(fig, tt, section=sec_label,
                                                    scale=1)
 
-            #
             # plot amplitudes across harmonics for electrode groups
 
             print('Plotting topographies and amplitudes across harmonics.')
@@ -326,10 +372,11 @@ def grand_average_plot():
 
                         # Plot for peak channels without topographies
                         fig = evoked_roi.plot(spatial_colors=True, picks=None,
-                                              scalings=unit_scalings, gfp=True)
+                                              scalings=unit_scalings,
+                                              gfp=False)
 
                         fname_fig = op.join(figs_path,
-                                            file_label + '_%s.pdf' % roi)
+                                            file_label + '_%s.jpg' % roi)
 
                         print('Creating figure %s.' % fname_fig)
 
@@ -366,7 +413,7 @@ def grand_average_plot():
                     fig.tight_layout(pad=1.)
 
                     fname_fig = op.join(
-                        figs_path, file_label + '_svd.pdf')
+                        figs_path, file_label + '_svd.jpg')
 
                     # save figure for this channel type
                     fig.savefig(fname_fig)
@@ -418,10 +465,11 @@ def grand_average_plot():
 
                         # Plot for peak channels without topographies
                         fig = evoked_roi.plot(spatial_colors=True, picks=None,
-                                              scalings=unit_scalings, gfp=True)
+                                              scalings=unit_scalings,
+                                              gfp=False)
 
                         fname_fig = op.join(figs_path,
-                                            file_label + '_%s.pdf' % roi)
+                                            file_label + '_%s.jpg' % roi)
 
                         print('Creating figure %s.' % fname_fig)
 
@@ -455,13 +503,13 @@ def grand_average_plot():
 
                     # Plot for peak channels without topographies
                     fig = evoked.plot(spatial_colors=True, picks=None,
-                                      scalings=unit_scalings, gfp=True)
+                                      scalings=unit_scalings, gfp=False)
 
                     sec_label = '%s_%s' % (cond, freq_str)
 
                     file_label = '%s_%s_%s_%s' % (prefix, cond, tt, freq_str)
 
-                    fname_fig = op.join(figs_path, file_label + '.pdf')
+                    fname_fig = op.join(figs_path, file_label + '.jpg')
 
                     print('Creating figure %s.' % fname_fig)
 
@@ -492,13 +540,13 @@ def grand_average_plot():
 
                     # Plot for peak channels without topographies
                     fig = evoked.plot(spatial_colors=True, picks=None,
-                                      scalings=unit_scalings, gfp=True)
+                                      scalings=unit_scalings, gfp=False)
 
                     sec_label = '%s_%s' % (cond, freq_str)
 
                     file_label = '%s_%s_%s_%s' % (prefix, cond, tt, freq_str)
 
-                    fname_fig = op.join(figs_path, file_label + '.pdf')
+                    fname_fig = op.join(figs_path, file_label + '.jpg')
 
                     print('Creating figure %s.' % fname_fig)
 
@@ -526,13 +574,13 @@ def grand_average_plot():
                     evoked = psds[modal][tt][cond][freq]
 
                     fig = evoked.plot(spatial_colors=True, picks=None,
-                                      scalings=unit_scalings, gfp=True)
+                                      scalings=unit_scalings, gfp=False)
 
                     sec_label = '%s_%s' % (cond, freq_str)
 
                     file_label = '%s_%s_%s_%s' % (prefix, cond, tt, freq_str)
 
-                    fname_fig = op.join(figs_path, file_label + '.pdf')
+                    fname_fig = op.join(figs_path, file_label + '.jpg')
 
                     print('Creating figure %s.' % fname_fig)
 
@@ -552,10 +600,11 @@ def grand_average_plot():
 
                         # Plot for peak channels without topographies
                         fig = evoked_roi.plot(spatial_colors=True, picks=None,
-                                              scalings=unit_scalings, gfp=True)
+                                              scalings=unit_scalings,
+                                              gfp=False)
 
                         fname_fig = op.join(figs_path,
-                                            file_label + '_%s.pdf' % roi)
+                                            file_label + '_%s.jpg' % roi)
 
                         print('Creating figure %s.' % fname_fig)
 
@@ -586,14 +635,14 @@ def grand_average_plot():
 
                     # Plotting PSDs across harmonics
                     fig = evoked.plot(spatial_colors=True, picks=None,
-                                      scalings=unit_scalings, gfp=True)
+                                      scalings=unit_scalings, gfp=False)
 
                     sec_label = '%s_%s' % (cond, freq_str)
 
                     file_label = '%s_%s_%s_%s' % (prefix, cond, tt,
                                                   freq_str)
 
-                    fname_fig = op.join(figs_path, file_label + '.pdf')
+                    fname_fig = op.join(figs_path, file_label + '.jpg')
 
                     print('Creating figure %s.' % fname_fig)
 
@@ -610,11 +659,7 @@ def grand_average_plot():
 
         modal = 'stc'  # do source estimates here
 
-        # do only those for STCs
-        do_types = ['psd_sum_odd', 'psd_sum_base', 'psd_harm_topos_odd',
-                    'psd_harm_topos_base']
-
-        for tt in types:
+        for tt in stc_types:
 
             for cond in conds:  # conditions
 
@@ -672,19 +717,19 @@ def grand_average_plot():
 
                     thresh = np.abs(stc.data[:, idx0]).max()
 
-                    # get some round numbers for colour bar
+                    # # get some round numbers for colour bar
 
-                    if thresh < 10:
+                    # if thresh < 10:
 
-                        thresh = np.floor(thresh)
+                    #     thresh = np.floor(thresh)
 
-                    elif thresh < 50:
+                    # elif thresh < 50:
 
-                        thresh = 5 * np.floor(thresh / 5.)
+                    #     thresh = 5 * np.floor(thresh / 5.)
 
-                    else:
+                    # else:
 
-                        thresh = 10 * np.floor(thresh / 10.)
+                    #     thresh = 10 * np.floor(thresh / 10.)
 
                     # plot for left and right hemisphere
                     for hemi in ['both']:  # ['lh', 'rh']:
@@ -721,6 +766,7 @@ def grand_average_plot():
                         # for 'lat'
                         for view in ['lat']:
 
+                            # apparently 'brain' required for saving?
                             brain = stc.plot(
                                 subject=subject, initial_time=0.,
                                 time_label=time_label,

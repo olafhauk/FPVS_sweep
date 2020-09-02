@@ -30,6 +30,8 @@ print(mne)
 # whether to show figures on screen or just write to file
 show = False
 
+# conditions
+conds = config.do_conds
 
 def run_filter_raw(sbj_id):
     """Clean data for one subject."""
@@ -37,11 +39,23 @@ def run_filter_raw(sbj_id):
     sbj_path = op.join(config.data_path, config.map_subjects[sbj_id][0])
 
     # raw-filename mappings for this subject
+    tmp_fnames = config.sss_map_fnames[sbj_id][1]
+
+    # only use files for correct conditions
+    sss_map_fnames = []
+    for cond in conds:
+        for [fi, ff] in enumerate(tmp_fnames):
+            if cond in ff:
+                sss_map_fnames.append(ff)
+
+    print(sss_map_fnames)
+
+    # raw-filename mappings for this subject
     sss_map_fname = config.sss_map_fnames[sbj_id]
 
     bad_eeg = config.bad_channels[sbj_id]['eeg']  # bad EEG channels
 
-    for raw_stem_in in sss_map_fname[1]:
+    for raw_stem_in in sss_map_fnames:
 
         # input file to read
         raw_fname_in = op.join(sbj_path, raw_stem_in + '.fif')
@@ -66,7 +80,7 @@ def run_filter_raw(sbj_id):
             raw.interpolate_bads(mode='accurate', reset_bads=True)
 
             print('Setting EEG reference.')
-            raw.set_eeg_reference(ref_channels='average')
+            raw.set_eeg_reference(ref_channels='average', projection=True)
 
         else:
 
@@ -74,7 +88,8 @@ def run_filter_raw(sbj_id):
 
         print('Applying Notch filter.')
 
-        raw.notch_filter(np.array([50, 100]), fir_design='firwin')
+        raw.notch_filter(np.array([50, 100]), fir_design='firwin',
+                         trans_bandwidth=0.04)
 
         # str() because of None
         print('Applying band-pass filter %s to %s Hz.' % (str(config.l_freq),
@@ -120,6 +135,55 @@ def run_filter_raw(sbj_id):
         else:
 
             print('No events found in file %s.' % raw_fname_in)
+
+        # get response latencies for target stimuli (colour changes)
+
+        # find target events (colour changes, trigger value 8)
+        targ_eves = np.where(events[:, 2] == 8)[0]
+
+        if len(targ_eves) > 0:  # only if target events present (not rest)
+
+            rts = []  # collect response times for this fiff-file
+
+            # find response events (triggers >= 4096, allowing trigger overlap)
+            resp_eves = np.where(events[:, 2] >= 4096)[0]
+
+            # find responses closest following targets, compute time difference
+            for tt in targ_eves:
+
+                rt = []  # rt for this particular target
+
+                # find first response that follows target
+                for rr in resp_eves:
+
+                    if rr > tt:
+
+                        # subtract samples response - target
+                        rt = events[rr, 0] - events[tt, 0]
+
+                        # turn samples to latency (ms)
+                        rt = 1000. * (rt / raw.info['sfreq'])
+
+                        # only count if RT below a threshold
+                        if rt <= 2000.:
+
+                            rts.append(rt)
+
+                        break  # leave this loop
+
+            if rts == []:  # if no good responses found
+
+                print('\nNo good target responses found!\n')
+
+            else:
+
+                print('\nResponse times to targets:\n')
+                print(*rts)
+                print('Mean: %f.' % np.mean(rts))
+
+        else:
+
+            print('No target events present.')
 
     return raw, events
 

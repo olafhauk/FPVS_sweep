@@ -121,12 +121,13 @@ def plot_evo_topomap(evoked, times, chtypes, fname_fig):
         print(chtype)
 
         # plot topography for one channel type at a time
-        fig = evoked.plot_topomap(times=times, ch_type=chtype,
+        fig = evoked.plot_topomap(times=times, ch_type=chtype, vmin=0.,
+                                  time_format='',
                                   scalings=unit_scalings[chtype],
-                                  units='snr', show=False)
+                                  units='Z', show=False)
 
         # filename for figure
-        fname_fig_ch = '%s_%s.pdf' % (fname_fig, chtype)
+        fname_fig_ch = '%s_%s.jpg' % (fname_fig, chtype)
 
         print('Saving figure for combined topography across harmonics to: %s.'
               % fname_fig_ch)
@@ -167,6 +168,14 @@ def psds_across_harmonics(psd, freqs, basefreq, oddfreq, n_harms, n_bins,
         psd_harms: instance of Evoked or Source Estimate,
             data of dimension (2 * n_bins + 1).
             The combined PSDs around harmonics.
+        topo: instance of Evoked or Source Estimate
+            Topography of the combined responses across harmonics at centre
+            frequency (0 Hz in psd_harms).
+        topos: instance of Evoked or Source Estimate
+            Topographies across harmonics.
+        freqs_harm: list of float
+            Frequencies of harmonics taken into account.
+
     """
     # get data into numpy array, works for Evoked and SourceEstimate
     data = psd.data
@@ -174,32 +183,38 @@ def psds_across_harmonics(psd, freqs, basefreq, oddfreq, n_harms, n_bins,
     if basefreq is not None:
         # get harmonics of oddfreq that do not overlap with harmonics of
         # basefreq
-        harm_freqs = _get_valid_harmonics(freqs, basefreq, oddfreq, n_harms)
+        freqs_harm = _get_valid_harmonics(freqs, basefreq, oddfreq, n_harms)
 
     else:
 
-        harm_freqs = np.arange(oddfreq, (n_harms + 1) * oddfreq, oddfreq)
+        freqs_harm = np.arange(oddfreq, (n_harms + 1) * oddfreq, oddfreq)
 
     # find indices corresponding to valid harmonic frequencies
-    harm_idx = [np.abs(ff - freqs).argmin() for ff in harm_freqs]
+    harm_idx = [np.abs(ff - freqs).argmin() for ff in freqs_harm]
 
     # initialise sum of PSD-segments across harmonics
     data_harms = np.zeros([data.shape[0], 2 * n_bins + 2 * n_gap + 1])
 
-    # Sum up PSDs around harmonics
-    for ii in harm_idx:
+    # initialise topographies across harmonics
+    topos_mat = np.zeros([data.shape[0], len(freqs_harm)])
 
-        idx = np.arange(ii - n_bins - n_gap, ii + n_bins + n_gap + 1)
+    # Sum up PSDs around harmonics
+    for (ii, iii) in enumerate(harm_idx):
+
+        idx = np.arange(iii - n_bins - n_gap, iii + n_bins + n_gap + 1)
 
         # get PSD for bin around harmonic
         data_now = data[:, idx]
 
         data_harms = data_harms + data_now
 
+        # collect topography at harmonic
+        topos_mat[:, ii] = data_now[:, n_bins + n_gap]
+
     # average if requested
     if method == 'avg':
 
-        data_harms = data_harms / harm_freqs.size
+        data_harms = data_harms / freqs_harm.size
 
     freq_resol = freqs[1] - freqs[0]
 
@@ -216,6 +231,17 @@ def psds_across_harmonics(psd, freqs, basefreq, oddfreq, n_harms, n_bins,
         psd_harms = SourceEstimate(data=data_harms, vertices=vertices,
                                    tmin=tmin, tstep=tstep)
 
+        # topography for combined responses at centre frequency
+        t = data_harms[:, n_bins + n_gap]
+
+        topo = SourceEstimate(
+            data=t[np.newaxis, :].T, vertices=vertices,
+            tmin=0., tstep=0.001)
+
+        # topographies for all harmonics
+        topos = SourceEstimate(
+            data=topos_mat, vertices=vertices, tmin=0., tstep=0.001)
+
     elif type(psd) is EvokedArray:
 
         info = psd.info
@@ -226,11 +252,23 @@ def psds_across_harmonics(psd, freqs, basefreq, oddfreq, n_harms, n_bins,
 
         psd_harms = EvokedArray(data_harms, info, tmin=tmin, nave=nave)
 
+        # topography for combined responses at centre frequency
+        t = data_harms[:, n_bins + n_gap]
+
+        print(t.shape)
+
+        topo = EvokedArray(
+            t[np.newaxis, :].T, info, tmin=0., nave=nave)
+
+        # topographies for all harmonics
+        topos = EvokedArray(
+            topos_mat, info, tmin=0.)
+
     else:
 
         print('Type of ''psd'' not known (%s)' % type(psd))
 
-    return psd_harms
+    return psd_harms, topo, topos, freqs_harm
 
 
 def combine_harmonics_topos(psd, freqs, basefreq, oddfreq, n_harms,
@@ -479,7 +517,6 @@ def psd_z_score(psd, n_bins, mode='z', n_gap=0, minmax=True):
         snr' is amplitude divided by standard deviation;
         'baseline' only subtracts baseline.
     """
-    # TO DO: faster with matrix computations?
     # get PSD as numpy array (works for Evoked and SourceEstimate)
     data = psd.data
 
@@ -896,7 +933,7 @@ def plot_psd_as_evo(psd, sbj_path, picks=None, txt_label='',
 
     for (cc, ff) in zip(ch_types, figs):
 
-        for fig_format in ['.pdf']:  # jpg doesn't work, png does
+        for fig_format in ['.jpg']:  # jpg doesn't work, png does
 
             fname_fig = op.join(sbj_path, 'Figures', txt_label + '_' +
                                 str(cc) + fig_format)
@@ -1031,7 +1068,7 @@ def plot_TFR(powtfr, idx_std, std_max_channel, freq_std, sbj_path, raw_stem_in,
     # std_max_channel: name of channel with max amplitude at standard frequency
     # freq_std: standard presentation frequency
     # sbj_path: path where "Figures" sub-directory is
-    # raw_stem_in: part of the filename, for PDF filename
+    # raw_stem_in: part of the filename, for JPG filename
     # txt_label: string to make filename more specific
     # close_fig: close figure or not
 
@@ -1052,7 +1089,7 @@ def plot_TFR(powtfr, idx_std, std_max_channel, freq_std, sbj_path, raw_stem_in,
     crop_str = str(int(10000. * config.crop_times[0])) + '_' + str(int(10000. * config.crop_times[1]))
 
     # name depends on crop_time in config.py
-    fname_fig = op.join(sbj_path, 'Figures', 'TFR_' + txt_label + raw_stem_in + '_sss_f_raw_ica_' + crop_str + '.pdf')
+    fname_fig = op.join(sbj_path, 'Figures', 'TFR_' + txt_label + raw_stem_in + '_sss_f_raw_ica_' + crop_str + '.jpg')
     print('Saving figure to %s' % fname_fig)
 
     # Save PSD figure

@@ -26,6 +26,8 @@ from os import path as op
 
 import numpy as np
 
+from scipy.stats import ttest_rel
+
 from matplotlib import pyplot as plt
 
 from copy import deepcopy
@@ -35,6 +37,7 @@ from importlib import reload
 import mne
 from mne.report import Report
 from mne.source_estimate import SourceEstimate
+from mne.evoked import EvokedArray
 
 import FPVS_functions
 reload(FPVS_functions)
@@ -84,14 +87,23 @@ gm_modals = ['evo_gm', 'stc_gm']
 # modals = ['stc']
 # gm_modals = ['stc_gm']
 
+# for evoked
 types = ['psd', 'psd_z', 'psd_sum_odd', 'psd_sum_base', 'psd_harm_odd',
          'psd_harm_base', 'psd_harm_topos_odd', 'psd_harm_topos_base']
 
 # only for evoked: data for peak channels per condition
 evo_types = [
-    'peak_odd', 'z_peak_odd', 'harm_odd_peak_odd', 'harm_base_peak_odd',
-    'peak_base', 'z_peak_base', 'harm_odd_peak_base', 'harm_base_peak_base',
-    'peak_harm_topos_odd', 'peak_harm_topos_base']
+    'peak_odd', 'z_peak_odd', 'harm_odd_peak_odd',
+    'harm_base_peak_odd', 'peak_base', 'z_peak_base', 'harm_odd_peak_base',
+    'harm_base_peak_base', 'peak_harm_topos_odd', 'peak_harm_topos_base']
+
+# for STCs
+stc_types = ['psd', 'psd_sum_odd', 'psd_sum_base', 'psd_harm_odd',
+             'psd_harm_base', 'psd_harm_topos_odd', 'psd_harm_topos_base']
+
+# conditions
+# conds = ['face', 'pwhf', 'pwlf', 'lfhf']
+conds = config.do_conds
 
 
 def grand_average_psds(sbj_ids):
@@ -103,15 +115,15 @@ def grand_average_psds(sbj_ids):
 
     # report = Report(subject='GM', title='FPVS PSDs GM')
 
-    # get condition names and frequency names
-    # assumed to be consistent across subjects
-    sss_map_fname = config.sss_map_fnames[sbj_ids[0]]
-    conds = []  # names of conditions
-    for raw_stem_in in sss_map_fname[1][2:]:
+    # # get condition names and frequency names
+    # # assumed to be consistent across subjects
+    # sss_map_fname = config.sss_map_fnames[sbj_ids[0]]
+    # conds = []  # names of conditions
+    # for raw_stem_in in sss_map_fname[1][2:]:
 
-        conds.append(raw_stem_in[:4])
+    #     conds.append(raw_stem_in[:4])
 
-    conds = np.unique(conds)
+    # conds = np.unique(conds)
 
     # initialise
 
@@ -152,6 +164,30 @@ def grand_average_psds(sbj_ids):
 
                     psds[modal][tt][cond][freq] = []  # subjects
 
+    # initialise array for electrode ROIs for group statistics
+    roi_elecs = {}
+    for roi in config.electrode_ROIs:
+
+        roi_elecs[roi] = {}
+
+        for cond in conds:
+
+            roi_elecs[roi][cond] = {}
+
+            if cond == 'face':  # no frequency sweep for faces
+
+                freqs = ['6.0']  # base frequency for this condition (Hz as string)
+
+            else:  # for all word condition, use all sweep frequencies
+
+                # base frequencies for this condition (Hz as string)
+                freqs = freqs_all
+
+            for freq in freqs:
+
+                roi_elecs[roi][cond][freq] = {'odd': np.zeros(len(sbj_ids)),
+                                              'base': np.zeros(len(sbj_ids))}
+
     # Reading evoked data, getting data for channel groups
     if 'evo' in modals:
 
@@ -178,7 +214,7 @@ def grand_average_psds(sbj_ids):
 
             # for Evoked data are in one file for all frequencies
             # for STC data are in separate files per condition and freq
-            for sbj_id in sbj_ids:  # across all subjects, EDIT ###
+            for [ss, sbj_id] in enumerate(sbj_ids):  # across all subjects
 
                 # path to subject's data
                 sbj_path = op.join(config.data_path,
@@ -403,6 +439,27 @@ def grand_average_psds(sbj_ids):
                     psds[modal]['peak_harm_topos_odd'][cond][freq].append(
                         evoked_peak)
 
+                    # Get data for group statistics (e.g. laterality)
+                    # RMS across electrodes in ROI
+                    for roi in config.electrode_ROIs:
+
+                        ch_names = config.electrode_ROIs[roi]
+
+                        for stim in ['base', 'odd']:
+
+                            type_now = 'psd_harm_' + stim
+
+                            evoked_roi = deepcopy(
+                                psds[modal][type_now][cond][freq][-1])
+
+                            evoked_roi.pick_channels(ch_names)
+
+                            idx0 = evoked_roi.time_as_index(0.)
+
+                            roi_rms = np.sqrt((evoked_roi.data[:, idx0]**2).mean())
+
+                            roi_elecs[roi][cond][freq][stim][ss] = roi_rms
+
     # Reading source estimate (STC) data
     if 'stc' in modals:
 
@@ -447,13 +504,13 @@ def grand_average_psds(sbj_ids):
                     stc = mne.read_source_estimate(fname_stc)
                     psds[modal]['psd'][cond][freq].append(stc)
 
-                    fname_stc = op.join(
-                        sbj_path, 'STC', '%sPSDTopoZ_%s_%s_mph-lh.stc' %
-                        (prefix, cond, freq)
-                    )
-                    print(fname_stc)
-                    stc = mne.read_source_estimate(fname_stc)
-                    psds[modal]['psd_z'][cond][freq].append(stc)
+                    # fname_stc = op.join(
+                    #     sbj_path, 'STC', '%sPSDTopoZ_%s_%s_mph-lh.stc' %
+                    #     (prefix, cond, freq)
+                    # )
+                    # print(fname_stc)
+                    # stc = mne.read_source_estimate(fname_stc)
+                    # psds[modal]['psd_z'][cond][freq].append(stc)
 
                     fname_stc = op.join(
                         sbj_path, 'STC', '%sPSDHarm_%s_%s_mph-lh.stc' %
@@ -507,7 +564,7 @@ def grand_average_psds(sbj_ids):
 
                 print('Grand-averaging source estimates.')
 
-                for tt in types:
+                for tt in stc_types:
 
                     stcs = psds[modal][tt][cond][freq]
 
@@ -525,7 +582,7 @@ def grand_average_psds(sbj_ids):
 
                     stc_avg.save(fname_stc)
 
-    # Compute Grand-Averages
+    # Compute Grand-Averages for Evoked data
 
     # Path for grand-mean results
     sbj_path = config.grandmean_path
@@ -598,7 +655,140 @@ def grand_average_psds(sbj_ids):
 
                     mne.write_evokeds(fname=fname_evo, evoked=evoked)
 
+            # Group Statistics for electrode ROIs
+            for freq in freqs:
+
+                for stim in ['base', 'odd']:
+
+                    print('\nEEG laterality statistics for %s.' % stim)
+
+                    data1 = roi_elecs['OT_L'][cond][freq][stim]
+                    data2 = roi_elecs['OT_R'][cond][freq][stim]
+
+                    stat, pv = ttest_rel(data1, data2)
+
+                    print('T-test for L-R, %s | %s (%f vs %f).' %
+                          (cond, freq, data1.mean(), data2.mean()))
+                    print('%f, %f\n' % (stat, pv))
+
+            # plot peak amplitudes across individual participants
+            for freq in freqs:
+
+                for stim in ['base', 'odd']:
+
+                    type_now = 'harm_%s_peak_%s' % (stim, stim)
+
+                    evokeds = deepcopy(psd_evo[type_now][cond][freq])
+
+                    # get amplitudes at centre frequency per channel type
+                    amps = get_amps_channel_types(evokeds)
+
+                    for ch_type in amps.keys():
+
+                        fig, ax = plt.subplots()
+
+                        n = len(amps[ch_type])
+
+                        x = np.arange(1, n + 1)
+
+                        ax.bar(x, amps[ch_type])
+
+                        threshold = 1.96
+                        ax.plot([0., n], [threshold, threshold], "k--")
+
+                        # output directory for figures
+                        figs_path = op.join(config.grandmean_path, 'Figures_ICA')
+
+                        fig_fname = op.join(
+                            figs_path, 'face_amps_indiv_%s_%s.jpg' % (stim, ch_type))
+
+                        print('Saving figure to %s.' % fig_fname)
+
+                        fig.savefig(fig_fname)
+
+                        plt.close(fig)
+
+                    # put amplitudes into list of lists for correlation
+                    amps_list = [amps['eeg'], amps['grad'], amps['mag']]
+
+                    corrs = np.corrcoef(amps_list)
+
+                    print('Condition: %s.' % stim)
+
+                    print('Correlations of peak amplitudes between channel'
+                          ' types across participants:')
+                    print(corrs)
+
+
+
+        # FOR FACES ONLY, put topographies for individual subjects together
+        evos = psds['evo']['psd_sum_odd']['face']['6.0']
+
+        data = evos[0].data
+
+        # numpy array for topographies with shape (# sensors, # subjects)
+        evo_mats = np.zeros((data.shape[0], len(evos)))
+
+        for (ei, ee) in enumerate(evos):
+
+            # evoked only has one sample
+            evo_mats[:, ei] = ee.data[:, 0]
+
+            evoked = EvokedArray(evo_mats, evos[0].info, tmin=0)
+
+            fname_evo = op.join(
+                sbj_path, 'AVE', 'GM_sum_indiv_topos_%s_%s-ave.fif' %
+                ('face', '6.0'))
+
+            print('Writing individual topographies to %s.' % fname_evo)
+
+            mne.write_evokeds(fname_evo, evoked)
+
     return
+
+
+def get_amps_channel_types(evokeds):
+    """Extract RMS amplitudes across channels per channel type at latency 0.
+
+    Parameters:
+    evokeds: list of instances of Evoked
+        Evokeds objects to extract amplitudes from, e.g. for peak channels
+        per channel type.
+
+    Returns:
+    amps: dict of list
+        Dictionary ('mag'/'grad'/'eeg') with lists (amplitudes per evoked).
+    """
+
+    ch_types = ['mag', 'grad', 'eeg']
+
+    amps = {'mag': [], 'grad': [], 'eeg': []}
+
+    for evoked in evokeds:
+
+        for ch_type in ch_types:
+
+            if ch_type in ['mag', 'grad']:
+
+                meg = ch_type
+                eeg = False
+
+            else:
+
+                eeg = True
+                meg = False
+
+            evo = deepcopy(evoked)
+
+            evo.pick_types(meg=meg, eeg=eeg, eog=False, ecg=False)
+
+            idx0 = evo.time_as_index(0.)
+
+            rms = np.sqrt((evo.data[:, idx0]**2).mean())
+
+            amps[ch_type].append(rms)
+
+    return amps
 
 
 def grand_average_conditions_data(data, evokeds, ch_names):

@@ -46,12 +46,12 @@ job_list = [
     #  'mem': '1G',                    # memory for qsub process
     #  'dep': ''},                       # name of preceeding process (optional)
 
-    # ### Filter raw data
-    # {'N':   'F_FR',                  # job name
-    #  'Py':  'FPVS_filter_raw_sweep',          # Python script
-    #  'Ss':  subjs,                    # subject indices
-    #  'mem': '16G',                    # memory for qsub process
-    #  'dep': ''},                      # name of preceeding process (optional)
+    ### Filter raw data
+    {'N':   'F_FR',                  # job name
+     'Py':  'FPVS_filter_raw_sweep',          # Python script
+     'Ss':  subjs,                    # subject indices
+     'mem': '16G',                    # memory for qsub process
+     'dep': ''},                      # name of preceeding process (optional)
 
     # # ### Filter raw data FM-> generating also txt event file
     # # {'N':   'F_FR',                  # job name
@@ -80,11 +80,44 @@ job_list = [
     #  'Ss':  subjs,                    # subject indices
     #  'mem': '8G',                    # memory for qsub process
     #  'dep': ''},
+    
     # ### Get epochs from sweeps for ERP analysis
+    # # lots of epochs, needs enough memory
     # {'N':   'F_EPO',                  # job name
     #  'Py':  'FPVS_epoch_sweeps',          # Python script
     #  'Ss':  subjs,                    # subject indices
-    #  'mem': '8G',                    # memory for qsub process
+    #  'mem': '32G',                    # memory for qsub process
+    #  'dep': ''},
+    # ### Average epochs
+    # {'N':   'F_EVO',                  # job name
+    #  'Py':  'FPVS_average_epochs',          # Python script
+    #  'Ss':  subjs,                    # subject indices
+    #  'mem': '2G',                    # memory for qsub process
+    #  'dep': 'F_EPO'},
+    # ### Plot evoked curves and topographies
+    # {'N':   'F_PlEVO',                  # job name
+    #  'Py':  'FPVS_plot_evoked',          # Python script
+    #  'Ss':  subjs,                    # subject indices
+    #  'mem': '2G',                    # memory for qsub process
+    #  'dep': 'F_EVO'},
+    #  ### Source estimation for evoked data
+    # {'N':   'F_MNEEVO',                  # job name
+    #  'Py':  'FPVS_source_estimation_evoked',          # Python script
+    #  'Ss':  subjs,                    # subject indices
+    #  'mem': '2G',                    # memory for qsub process
+    #  'dep': 'F_EVO'},
+
+    #   ### Grand-average and plot source estimates (should be run separately)
+    # {'N':   'F_MNEEVO',                  # job name
+    #  'Py':  'FPVS_average_evoked_STCs',          # Python script
+    #  'Ss':  [99],                    # subject indices
+    #  'mem': '2G',                    # memory for qsub process
+    #  'dep': ''},
+    # ### Grand-average and plot evoked data (should be run separately)
+    # {'N':   'F_GMEvo',                  # job name
+    #  'Py':  'FPVS_grand_average_evoked',          # Python script
+    #  'Ss':  [99],                    # subject indices
+    #  'mem': '2G',                    # memory for qsub process
     #  'dep': ''},
 
     # ### Compute PSDs for averaged sweeps and plot (change ica_suff in config_sweep.py if necessary)
@@ -107,20 +140,20 @@ job_list = [
     #  'mem': '2G',                    # memory for qsub process
     #  'dep': 'F_P_C'},
 
-    ### Compute Grand-Mean (only for 1 "subject")
-    # cannot be dependent on previous scripts, because they would
-    # have to complete for all participants
-    {'N':   'F_GM',                  # job name
-     'Py':  'FPVS_GrandAverage_PSDs',          # Python script
-     'Ss':  [99],                    # subject indices
-     'mem': '1G',                    # memory for qsub process
-     'dep': ''},
-    ### Plot Grand-Mean (only for 1 "subject")
-    {'N':   'F_GMP',                  # job name
-     'Py':  'FPVS_GrandAverage_Plot',          # Python script
-     'Ss':  [99],                    # subject indices
-     'mem': '1G',                    # memory for qsub process
-     'dep': 'F_GM'},
+    # ### Compute Grand-Mean (only for 1 "subject")
+    # # cannot be dependent on previous scripts, because they would
+    # # have to complete for all participants
+    # {'N':   'F_GM',                  # job name
+    #  'Py':  'FPVS_GrandAverage_PSDs',          # Python script
+    #  'Ss':  [99],                    # subject indices
+    #  'mem': '1G',                    # memory for qsub process
+    #  'dep': ''},
+    # ### Plot Grand-Mean (only for 1 "subject")
+    # {'N':   'F_GMP',                  # job name
+    #  'Py':  'FPVS_GrandAverage_Plot',          # Python script
+    #  'Ss':  [99],                    # subject indices
+    #  'mem': '1G',                    # memory for qsub process
+    #  'dep': 'F_GM'},
 
     #  ### Create BEM surfaces and model
     # {'N':   'F_Cov',                  # job name

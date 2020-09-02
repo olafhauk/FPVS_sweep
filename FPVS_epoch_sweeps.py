@@ -29,6 +29,8 @@ reload(config)
 
 print(mne.__version__)
 
+# conditions
+conds = config.do_conds
 
 def run_epoch_sweeps(sbj_id):
     """Compute epochs for one subject."""
@@ -36,160 +38,180 @@ def run_epoch_sweeps(sbj_id):
     sbj_path = op.join(config.data_path, config.map_subjects[sbj_id][0])
 
     # raw-filename mappings for this subject
-    sss_map_fname = config.sss_map_fnames[sbj_id]
+    tmp_fnames = config.sss_map_fnames[sbj_id][1]
 
-    # initialise dict for results
-    # one dict per condition (e.g. 'hflf'), then for frequency (e.g. '12.'),
-    # then list of individual sweeps
-    names = []  # names of conditions
-    for raw_stem_in in sss_map_fname[1][2:]:
+    # only use files for correct conditions
+    sss_map_fnames = []
+    for cond in conds:
+        for [fi, ff] in enumerate(tmp_fnames):
+            if cond in ff:
+                sss_map_fnames.append(ff)
 
-        names.append(raw_stem_in[:4])
-
-    names = np.unique(names)
+    print(sss_map_fnames)
 
     # initialise for data at different sweep frequencies
     epochs = {}
-    for name in names:
+    for cond in conds:
 
-        epochs[name] = {}
+        epochs[cond] = {}
 
-        if name == 'face':
+        if cond == 'face':
 
             # faces only have one frequency
-            epochs[name]['6.0'] = []
+            epochs[cond]['6.0'] = []
+
+            # for Notch filter: base frequency and harmonics
+            freqs_notch = np.arange(6., 50., 6.)
 
         else:
 
             for freq in config.fpvs_freqs:
 
-                epochs[name][str(freq)] = []
+                epochs[cond][str(freq)] = []
 
-    # Note: Skip first two files since they are rest, no events
-    for raw_stem_in in sss_map_fname[1][2:]:
+                # for Notch filter: base frequency and harmonics
+                freqs_notch = np.arange(freq, config.psd_fmax, freq)
 
-        # omit "_raw" in middle of filename
-        raw_fname_in = op.join(sbj_path, raw_stem_in[:-4] + '_f_' +
-                               config.raw_ICA_suff + '.fif')
+    # create epochs with and without Notch filter for base frequency
+    for do_notch in [0, 1]:
 
-        print('\n###\nReading raw file %s.' % raw_fname_in)
-        raw_ori = mne.io.read_raw_fif(raw_fname_in, preload=True)
+        for raw_stem_in in sss_map_fnames:
 
-        # Filter for ERP analysis
-        # low-pass only, high-pass filter was applied earlier
-        raw_ori.filter(
-            l_freq=None, h_freq=40., method='fir', fir_design='firwin',
-            filter_length='auto', h_trans_bandwidth='auto')
+            # omit "_raw" in middle of filename
+            raw_fname_in = op.join(sbj_path, raw_stem_in[:-4] + '_f_' +
+                                   config.raw_ICA_suff + '.fif')
 
-        ### EDIT: Add Notch filter here
+            print('\n###\nReading raw file %s.' % raw_fname_in)
+            raw_ori = mne.io.read_raw_fif(raw_fname_in, preload=True)
 
-        raw = deepcopy(raw_ori)  # keep raw_ori for possible TFR analysis
+            # Filter for ERP analysis
+            # low-pass only, high-pass filter was applied earlier
+            raw_ori.filter(
+                l_freq=None, h_freq=40., method='fir', fir_design='firwin',
+                filter_length='auto', h_trans_bandwidth='auto')
 
-        # event file was written during filtering, already correcting
-        # projector stimulus delay
-        event_file = op.join(sbj_path, raw_stem_in + '_sss_f_raw-eve.fif')
-        print('Reading events from %s.' % event_file)
-        events = mne.read_events(event_file)
+            if do_notch:  # if Notch filter at base frequency requested
 
-        # Find indices of good events (onsets of runs without missing frames)
-        event_ids = config.fpvs_event_ids
+                # trans_bandwith 2* from Rossion et al. review, suppl. (0.02Hz)
+                raw_ori.notch_filter(freqs=freqs_notch, fir_design='firwin',
+                                     trans_bandwidth=0.04)
 
-        # duration of run incl. all sweeps and lead-in time at beginning
-        run_duration = config.fpvs_n_sweeps * config.fpvs_sweep_duration + \
-            config.fpvs_leadin
+                # add to epoch file name
+                str_notch = '_nch'
 
-        # idx_good, idx_bad: lists of indices to onsets of good/bad runs
-        idx_good, idx_bad = find_good_events(events, event_ids=event_ids,
-                                             run_duration=run_duration,
-                                             sfreq=raw.info['sfreq'])
+            else:
 
-        print('Good runs:')
-        print(idx_good)
-        print(events[idx_good, :])
+                str_notch = ''
 
-        if len(idx_bad) != 0:
-            print('Bad runs:')
-            print(idx_bad)
-            print(events[idx_bad, :])
-        else:
-            print('No bad runs.')
+            raw = deepcopy(raw_ori)  # keep raw_ori for possible TFR analysis
 
-        # go through all indices to good runs
-        for idx in idx_good:
+            # event file was written during filtering, already correcting
+            # projector stimulus delay
+            event_file = op.join(sbj_path, raw_stem_in + '_sss_f_raw-eve.fif')
+            print('Reading events from %s.' % event_file)
+            events = mne.read_events(event_file)
 
-            # onset time (s) for this good run
-            # there is one second gap between trigger and stimulus onset
-            # note: samples don't start at 0, but times do
-            onset_time = (events[idx, 0] - raw.first_samp) / raw.info['sfreq'] + 1.
+            # Find indices of good events (onsets of runs without missing frames)
+            event_ids = config.fpvs_event_ids
 
-            # TO DO: the following bit can be streamlined
+            # duration of run incl. all sweeps and lead-in time at beginning
+            run_duration = config.fpvs_n_sweeps * config.fpvs_sweep_duration + \
+                config.fpvs_leadin
 
-            if raw_stem_in[:4] == 'face':  # faces don't have "sweeps"
+            # idx_good, idx_bad: lists of indices to onsets of good/bad runs
+            idx_good, idx_bad = find_good_events(events, event_ids=event_ids,
+                                                 run_duration=run_duration,
+                                                 sfreq=raw.info['sfreq'])
 
-                # just get one "sweep"
-                raw_sweep = get_sweeps_from_raw(raw, t0=onset_time,
-                                                sweep_duration=60.,
-                                                n_sweeps=1)
+            print('Good runs:')
+            print(idx_good)
+            print(events[idx_good, :])
 
-                # Epoching for ERP analysis
-                print('###\nEpoching.')
-                event_id = 4  # onset of individual stimuli
-                epos = mne.Epochs(
-                    raw=raw_sweep[0], events=events, event_id=event_id,
-                    tmin=config.epo_t1, tmax=config.epo_t2, proj=True,
-                    baseline=config.epo_baseline, preload=True,
-                    reject=config.epo_reject)
+            if len(idx_bad) != 0:
+                print('Bad runs:')
+                print(idx_bad)
+                print(events[idx_bad, :])
+            else:
+                print('No bad runs.')
 
-                # append for each run and frequency
-                epochs[raw_stem_in[:4]]['6.0'].append(epos)
+            # go through all indices to good runs
+            for idx in idx_good:
 
-            else:  # for frequency sweeps
+                # onset time (s) for this good run
+                # there is one second gap between trigger and stimulus onset
+                # note: samples don't start at 0, but times do
+                onset_time =\
+                    (events[idx, 0] - raw.first_samp) / raw.info['sfreq'] + 1.
 
-                n_sweeps = len(config.fpvs_freqs)
+                # TO DO: the following bit can be streamlined
 
-                print('ID: %d, idx: %d, onset time: %f.' % (events[idx, 2],
-                                                            idx, onset_time))
+                if raw_stem_in[:4] == 'face':  # faces don't have "sweeps"
 
-                # raw_sweeps: list of raw instances per data segments,
-                # one per frequency
-                raw_sweeps = get_sweeps_from_raw(raw, t0=onset_time,
-                                                 sweep_duration=config.fpvs_sweep_duration,
-                                                 n_sweeps=n_sweeps)
-
-                for [fi, ff] in enumerate(config.fpvs_freqs):
+                    # just get one "sweep"
+                    raw_sweep = get_sweeps_from_raw(raw, t0=onset_time,
+                                                    sweep_duration=60.,
+                                                    n_sweeps=1)
 
                     # Epoching for ERP analysis
                     print('###\nEpoching.')
-                    event_id = 4  # onset of individual stimuli
+                    # Event IDs: 4(standard), 5 (oddball)
+                    event_id = 5  # onset of individual stimuli
                     epos = mne.Epochs(
-                        raw=raw_sweeps[fi], events=events, event_id=event_id,
+                        raw=raw_sweep[0], events=events, event_id=event_id,
                         tmin=config.epo_t1, tmax=config.epo_t2, proj=True,
                         baseline=config.epo_baseline, preload=True,
                         reject=config.epo_reject)
 
                     # append for each run and frequency
-                    epochs[raw_stem_in[:4]][str(ff)].append(epos)
+                    epochs[raw_stem_in[:4]]['6.0'].append(epos)
 
+                else:  # for frequency sweeps
 
-    # AVERAGE raw files per condition and frequency across runs
-    # write the result as raw fiff-file
-    for cond in epochs.keys():  # conditions
+                    n_sweeps = len(config.fpvs_freqs)
 
-        for freq in epochs[cond].keys():  # frequencies
+                    print('ID: %d, idx: %d, onset time: %f.' % (events[idx, 2],
+                                                                idx, onset_time))
 
-            # concatenate epochs across runs
-            epochs_conc = mne.concatenate_epochs(epochs[cond][freq])
+                    # raw_sweeps: list of raw instances per data segments,
+                    # one per frequency
+                    raw_sweeps = get_sweeps_from_raw(raw, t0=onset_time,
+                                                     sweep_duration=config.fpvs_sweep_duration,
+                                                     n_sweeps=n_sweeps)
 
-            epo_fname = op.join(
-                sbj_path, '%s_f_%s_%s_%s-epo.fif' %
-                (raw_stem_in[:4], config.raw_ICA_suff, cond,
-                 ''.join(freq.split('.'))))
+                    for [fi, ff] in enumerate(config.fpvs_freqs):
 
-            print('Writing epochs to %s.' % epo_fname)
+                        # Epoching for ERP analysis
+                        print('###\nEpoching.')
+                        # Event IDs: 4(standard), 5 (oddball)
+                        event_id = 5  # onset of individual stimuli
+                        epos = mne.Epochs(
+                            raw=raw_sweeps[fi], events=events, event_id=event_id,
+                            tmin=config.epo_t1, tmax=config.epo_t2, proj=True,
+                            baseline=config.epo_baseline, preload=True,
+                            reject=config.epo_reject)
 
-            epochs_conc.save(epo_fname)
+                        # append for each run and frequency
+                        epochs[raw_stem_in[:4]][str(ff)].append(epos)
 
-    return data_runs
+        # Concatenate epochs across runs
+        # write the result as fiff-file
+        for cond in epochs.keys():  # conditions
+
+            for freq in epochs[cond].keys():  # frequencies
+
+                # concatenate epochs across runs
+                epochs_conc = mne.concatenate_epochs(epochs[cond][freq])
+
+                epo_fname = op.join(
+                    sbj_path, 'EPO', '%s_f_%s_%s%s-epo.fif' %
+                    (cond, config.raw_ICA_suff, ''.join(freq.split('.')),
+                     str_notch))
+
+                print('Writing epochs to %s.' % epo_fname)
+
+                epochs_conc.save(epo_fname, overwrite=True)
+
+    return
 
 
 def find_good_events(events, event_ids, run_duration, sfreq):
@@ -329,4 +351,4 @@ else:
 for ss in sbj_ids:
 
     # raw, psds, psds_as_evo, freqs = run_PSD_raw(ss)
-    data_runs = run_epoch_sweeps(ss)
+    run_epoch_sweeps(ss)

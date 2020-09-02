@@ -16,15 +16,13 @@ import sys
 import os
 from os import path as op
 
-os.environ['QT_QPA_PLATFORM'] = 'offscreen'
-
 import numpy as np
 import scipy.io  # for exporting to Matlab
 
-# os.environ['QT_QPA_PLATFORM'] = 'offscreen'
+os.environ['QT_QPA_PLATFORM'] = 'offscreen'
 
-# from mayavi import mlab
-# mlab.options.offscreen = True
+from mayavi import mlab
+mlab.options.offscreen = True
 
 import matplotlib
 matplotlib.use('Agg') #  for running graphics on cluster ### EDIT
@@ -65,7 +63,9 @@ close_fig = 1  # close figures only if close_fig==1
 # for some plots of SNRs
 unit_scalings = dict(eeg=1., mag=1., grad=1.)
 
-print('Sunshine.')
+# conditions
+# conds = ['face', 'pwhf', 'pwlf', 'lfhf']
+conds = config.do_conds
 
 
 def run_PSD_plot(sbj_id):
@@ -85,13 +85,13 @@ def run_PSD_plot(sbj_id):
     # raw-filename mappings for this subject
     sss_map_fname = config.sss_map_fnames[sbj_id]
 
-    # get condition names and frequency names
-    conds = []  # names of conditions
-    for raw_stem_in in sss_map_fname[1][2:]:
+    # # get condition names and frequency names
+    # conds = []  # names of conditions
+    # for raw_stem_in in sss_map_fname[1][2:]:
 
-        conds.append(raw_stem_in[:4])
+    #     conds.append(raw_stem_in[:4])
 
-    conds = np.unique(conds)
+    # conds = np.unique(conds)
 
     # Base frequencies for frequency sweep for words (not faces)
     freqs_all = [str(ff) for ff in config.fpvs_freqs]
@@ -446,7 +446,7 @@ def run_PSD_plot(sbj_id):
 
             thresh = 10 * np.floor(thresh / 10.)
 
-        for hemi in ['both']: #  ['lh', 'rh']:
+        for hemi in ['both']:  #  ['lh', 'rh']:
 
             for view in ['lat', 'ven']:
 

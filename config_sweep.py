@@ -21,6 +21,9 @@ do_subjs = [1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 16, 18]
 # 15: MEG artifacts due to titanium plate
 # 17: no MRI
 
+# which conditions to process (after Maxfilter and filtering)
+do_conds = ['face']
+
 # paths to data:
 
 # path to acquired raw data
@@ -340,6 +343,11 @@ for ss in map_subjects:
     if not op.isdir(subj_dir_ave):
         print('Creating directory %s.' % subj_dir_ave)
         os.mkdir(subj_dir_ave)
+    # subject-specific sub-dir for epochs
+    subj_dir_epo = op.join(data_path, map_subjects[ss][0], 'EPO')
+    if not op.isdir(subj_dir_epo):
+        print('Creating directory %s.' % subj_dir_epo)
+        os.mkdir(subj_dir_epo)
     # subject-specific sub-dir for source space data
     subj_dir_stc = op.join(data_path, map_subjects[ss][0], 'STC')
     if not op.isdir(subj_dir_stc):
@@ -430,7 +438,7 @@ fpvs_odd_freq['words'] = 1.
 
 # number of harmonics to sum up
 # depends on frequency range used for PSD
-fpvs_n_harms_odd = 20
+fpvs_n_harms_odd = 10
 fpvs_n_harms_base = 10
 
 # duration of frequency segment per run
