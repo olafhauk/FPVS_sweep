@@ -33,6 +33,8 @@ show = False
 # conditions
 conds = config.do_conds
 
+conds = conds + ['rest1', 'rest2']
+
 def run_filter_raw(sbj_id):
     """Clean data for one subject."""
     # path to subject's data
@@ -49,9 +51,6 @@ def run_filter_raw(sbj_id):
                 sss_map_fnames.append(ff)
 
     print(sss_map_fnames)
-
-    # raw-filename mappings for this subject
-    sss_map_fname = config.sss_map_fnames[sbj_id]
 
     bad_eeg = config.bad_channels[sbj_id]['eeg']  # bad EEG channels
 

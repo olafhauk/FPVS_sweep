@@ -1,4 +1,4 @@
-#!/imaging/local/software/miniconda/envs/mne0.20/bin/python
+#!/imaging/local/software/miniconda/envs/mne0.21/bin/python
 """
 Plot FPVS Grand-Mean data.
 ==========================================
@@ -39,9 +39,6 @@ print('Sunshine')
 
 print(mne.__version__)
 
-# perform TFR of raw data or not
-# do_tfr = config.do_tfr
-
 # sub-directory for figures per subject
 # separate for ICAed and non-ICAed data
 if 'ica' in config.raw_ICA_suff:
@@ -67,12 +64,6 @@ if 'ica' in config.raw_ICA_suff:
     prefix = 'ICA'
 
 subjects_dir = config.subjects_dir
-
-# separate for ICAed and non-ICAed data
-if 'ica' in config.raw_ICA_suff:
-    figs_dir = 'Figures_ICA'
-else:
-    figs_dir = 'Figures'
 
 # average these three frequencies and plot separately
 avg_freqs = ['6.0', '4.0', '3.0']
@@ -136,6 +127,11 @@ def grand_average_plot():
     psds = {}
 
     do_modals = modals + gm_modals
+
+    # extract label amplitudes
+    label_amps = {}
+    for ss in stc_types:
+        label_amps[ss] = {'lh': [], 'rh': []}
 
     # Initialise
     for modal in do_modals:
@@ -261,10 +257,13 @@ def grand_average_plot():
 
         evoked = mne.read_evokeds(fname_evo, 0)
 
+        print('Scaling topographies per sample.')
+        evoked = Ff.scale_evoked_per_channel_type(evoked)
+
         for chtype in chtypes:
 
-            # scaling, with "threshold" for z-scores
-            vmin, vmax = 0., 10.
+            # scaling to individual maxima per topography
+            vmin, vmax = 0., 1.
 
             fig = evoked.plot_topomap(times=evoked.times, ch_type=chtype,
                                       vmin=vmin, vmax=vmax,
@@ -540,13 +539,21 @@ def grand_average_plot():
 
                     # Plot for peak channels without topographies
                     fig = evoked.plot(spatial_colors=True, picks=None,
-                                      scalings=unit_scalings, gfp=False)
+                                      scalings=unit_scalings, gfp=False,
+                                      sphere=0.)
 
                     sec_label = '%s_%s' % (cond, freq_str)
 
                     file_label = '%s_%s_%s_%s' % (prefix, cond, tt, freq_str)
 
                     fname_fig = op.join(figs_path, file_label + '.jpg')
+
+                    print('Creating figure %s.' % fname_fig)
+
+                    fig.savefig(fname_fig)
+
+                    # also create PDF because some edits may be needed
+                    fname_fig = op.join(figs_path, file_label + '.pdf')
 
                     print('Creating figure %s.' % fname_fig)
 
@@ -710,7 +717,7 @@ def grand_average_plot():
                     # use STC for this frequency
                     stc = stc_freqs[freq]
 
-                    time_label = '%s %s' % (cond, freq)
+                    time_label = None  # '%s %s' % (cond, freq)
 
                     # index to time point 0, which will be plotted
                     idx0 = np.abs(stc.times).argmin()

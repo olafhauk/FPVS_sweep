@@ -35,6 +35,9 @@ print(mne)
 # whether to show figures on screen or just write to file
 show = False
 
+# conditions
+conds = config.do_conds
+
 # "emulate" the args from ArgParser in Fiff_Compute_ICA.py
 # filenames depend on subject, the rest are variables
 class create_args:
@@ -65,11 +68,20 @@ def run_Compute_ICA(sbj_id):
     sbj_path = op.join(config.data_path, config.map_subjects[sbj_id][0])
 
     # raw-filename mappings for this subject
-    sss_map_fname = config.sss_map_fnames[sbj_id]
+    tmp_fnames = config.sss_map_fnames[sbj_id][1]
+
+    # only use files for correct conditions
+    sss_map_fnames = []
+    for cond in conds:
+        for [fi, ff] in enumerate(tmp_fnames):
+            if cond in ff:
+                sss_map_fnames.append(ff)
+
+    print(sss_map_fnames)
 
     # Concatenate raws. These raw files are not huge.
     raw_all = []  # will contain list of all raw files
-    for raw_stem_in in sss_map_fname[1]:
+    for raw_stem_in in sss_map_fnames:
 
         FileRaw = op.join(sbj_path, raw_stem_in[:-7] + 'sss_f_raw')
 

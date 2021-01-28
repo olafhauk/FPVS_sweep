@@ -1057,6 +1057,45 @@ def svd_per_channel_type(evokeds, idx=None):
     return ss
 
 
+def scale_evoked_per_channel_type(evoked):
+    """Scale topographies per sample to their absolute maxima per channel type.
+    Parameters:
+    evoked: instance of Evoked
+        The evoked data to use.
+
+    Returns:
+    evoked_scaled: instance of Evoked
+        The scaled evoked data.
+    """
+    from mne import pick_types
+    evoked_scaled = evoked.copy()
+    for cht in ['mag', 'grad', 'eeg']:
+
+        if evoked.__contains__(cht):  # only do channel types in evoked
+
+            # pick the current channel type
+            if cht == 'eeg':
+
+                meg = False
+                eeg = True
+
+            else:
+
+                meg = cht
+                eeg = False
+
+            picks_idx = pick_types(evoked.info, meg=meg, eeg=eeg)
+
+            # get data as numpy array for desired samples
+            data = evoked.data[picks_idx, :]
+            # normalise topographies to their individual maxima
+            data_max = np.abs(data).max(axis=0)
+
+            evoked_scaled.data[picks_idx, :] = data / data_max
+
+    return evoked_scaled
+
+
 # NOT USED
 # plot TRF results
 def plot_TFR(powtfr, idx_std, std_max_channel, freq_std, sbj_path, raw_stem_in,
@@ -1098,3 +1137,38 @@ def plot_TFR(powtfr, idx_std, std_max_channel, freq_std, sbj_path, raw_stem_in,
     # close PSD figure if in QSUB
     if close_fig:
         plt.close(fig)
+
+
+def pearsonr_ci(x, y, alpha=0.05):
+    ''' calculate Pearson correlation along with the confidence interval.
+    Parameters
+    ----------
+    x, y : iterable object such as a list or np.array
+      Input for correlation calculation
+    alpha : float
+      Significance level. 0.05 by default
+    Returns
+    -------
+    r : float
+      Pearson's correlation coefficient
+    pval : float
+      The corresponding p value
+    lo, hi : float
+      The lower and upper bound of confidence intervals
+
+    Modified from https://zhiyzuo.github.io/Pearson-Correlation-CI-in-Python/
+    '''
+    from scipy import stats
+
+    # incase x and y are lists
+    x = np.array(x)
+    y = np.array(y)
+
+    r, p = stats.pearsonr(x, y)
+    r_z = np.arctanh(r)
+    se = 1 / np.sqrt(x.size - 3)
+    z = stats.norm.ppf(1 - alpha / 2)
+    lo_z, hi_z = r_z - z * se, r_z + z * se
+    lo, hi = np.tanh((lo_z, hi_z))
+
+    return r, p, lo, hi

@@ -57,23 +57,28 @@ raw_ICA_suff = 'ica_raw'
 
 map_subjects = {
     1: ('meg19_0380', '191008'),  # pilot frequency sweep
-    2: ('meg19_0381', '191015'),  
-    3: ('meg19_0383', '191018'),  
+    2: ('meg19_0381', '191015'),
+    3: ('meg19_0383', '191018'),
     4: ('meg19_0384', '191021'),
-    5: ('meg19_0389', '191022'),    
+    5: ('meg19_0389', '191022'),
     6: ('meg19_0391', '191028'),
-    7: ('meg19_0392', '191029'),  
-    8: ('meg19_0396', '191031'),  # ARTEFACTS/BAD MEG CHANNELS due to zip on the participant's top 
-    9: ('meg19_0400', '191105'),  # in faces: pressing button with left hand (noticed in 2nd trial)
-    10: ('meg19_0406', '191108'),   #slouched down several times during the recording
-    11: ('meg19_0407', '191111'),   
-    12: ('meg19_0412', '191114'),   
-    13: ('meg19_0414', '191115'),   #big head + sleepy
-    14: ('meg19_0417', '191118'),   #sleepy
-    15: ('meg19_0421', '191122'),   # Titanium plate, ***************check if need to DISCARD noisy after Maxfilter probably discard
+    7: ('meg19_0392', '191029'),
+    # ARTEFACTS/BAD MEG CHANNELS due to zip on the participant's top
+    8: ('meg19_0396', '191031'),
+    # in faces: pressing button with left hand (noticed in 2nd trial)
+    9: ('meg19_0400', '191105'),
+    # slouched down several times during the recording
+    10: ('meg19_0406', '191108'),
+    11: ('meg19_0407', '191111'),
+    12: ('meg19_0412', '191114'),
+    13: ('meg19_0414', '191115'),  # big head + sleepy
+    14: ('meg19_0417', '191118'),  # sleepy
+    # Titanium plate, ***************check if need to DISCARD noisy after
+    # Maxfilter probably discard
+    15: ('meg19_0421', '191122'),
     16: ('meg19_0422', '191122'),
-    17: ('meg19_0425', '191125'),   #sleepy but NO alpha + some strange blinks
-    18: ('meg19_0442', '191205')    
+    17: ('meg19_0425', '191125'),  # sleepy but NO alpha + some strange blinks
+    18: ('meg19_0442', '191205')
 }
 
 # subject names of MRI data
@@ -195,95 +200,95 @@ sss_map_fnames = {
          'pwlf1_sss_raw', 'pwlf2_sss_raw', 'pwlf3_sss_raw',
          'lfhf1_sss_raw', 'lfhf2_sss_raw', 'lfhf3_sss_raw']),
     10: (['rest1_raw', 'rest2_raw',
-         'faces_raw',
-         'pwhf1_raw', 'pwhf2_raw', 'pwhf3_raw',
-         'pwlf1_raw', 'pwlf2_raw', 'pwlf3_raw',
-         'lfhf1_raw', 'lfhf2_raw', 'lfhf3_raw'],
+          'faces_raw',
+          'pwhf1_raw', 'pwhf2_raw', 'pwhf3_raw',
+          'pwlf1_raw', 'pwlf2_raw', 'pwlf3_raw',
+          'lfhf1_raw', 'lfhf2_raw', 'lfhf3_raw'],
          ['rest1_sss_raw', 'rest2_sss_raw',
-         'faces_sss_raw',
-         'pwhf1_sss_raw', 'pwhf2_sss_raw', 'pwhf3_sss_raw',
-         'pwlf1_sss_raw', 'pwlf2_sss_raw', 'pwlf3_sss_raw',
-         'lfhf1_sss_raw', 'lfhf2_sss_raw', 'lfhf3_sss_raw']),
+          'faces_sss_raw',
+          'pwhf1_sss_raw', 'pwhf2_sss_raw', 'pwhf3_sss_raw',
+          'pwlf1_sss_raw', 'pwlf2_sss_raw', 'pwlf3_sss_raw',
+          'lfhf1_sss_raw', 'lfhf2_sss_raw', 'lfhf3_sss_raw']),
     11: (['rest1_raw', 'rest2_raw',
-         'faces_raw',
-         'pwhf1_raw', 'pwhf2_raw', 'pwhf3_raw',
-         'pwlf1_raw', 'pwlf2_raw', 'pwlf3_raw',
-         'lfhf1_araw', 'lfhf2_raw', 'lfhf3_raw'],
+          'faces_raw',
+          'pwhf1_raw', 'pwhf2_raw', 'pwhf3_raw',
+          'pwlf1_raw', 'pwlf2_raw', 'pwlf3_raw',
+          'lfhf1_araw', 'lfhf2_raw', 'lfhf3_raw'],
          ['rest1_sss_raw', 'rest2_sss_raw',
-         'faces_sss_raw',
-         'pwhf1_sss_raw', 'pwhf2_sss_raw', 'pwhf3_sss_raw',
-         'pwlf1_sss_raw', 'pwlf2_sss_raw', 'pwlf3_sss_raw',
-         'lfhf1_sss_raw', 'lfhf2_sss_raw', 'lfhf3_sss_raw']),
+          'faces_sss_raw',
+          'pwhf1_sss_raw', 'pwhf2_sss_raw', 'pwhf3_sss_raw',
+          'pwlf1_sss_raw', 'pwlf2_sss_raw', 'pwlf3_sss_raw',
+          'lfhf1_sss_raw', 'lfhf2_sss_raw', 'lfhf3_sss_raw']),
     12: (['rest1_raw', 'rest2_raw',
-         'faces_raw',
-         'pwhf1_raw', 'pwhf2_raw', 'pwhf3_raw',
-         'pwlf1_raw', 'pwlf2_raw', 'pwlf3_raw',
-         'lfhf1_raw', 'lfhf2_raw', 'lfhf3_raw'],
+          'faces_raw',
+          'pwhf1_raw', 'pwhf2_raw', 'pwhf3_raw',
+          'pwlf1_raw', 'pwlf2_raw', 'pwlf3_raw',
+          'lfhf1_raw', 'lfhf2_raw', 'lfhf3_raw'],
          ['rest1_sss_raw', 'rest2_sss_raw',
-         'faces_sss_raw',
-         'pwhf1_sss_raw', 'pwhf2_sss_raw', 'pwhf3_sss_raw',
-         'pwlf1_sss_raw', 'pwlf2_sss_raw', 'pwlf3_sss_raw',
-         'lfhf1_sss_raw', 'lfhf2_sss_raw', 'lfhf3_sss_raw']),
+          'faces_sss_raw',
+          'pwhf1_sss_raw', 'pwhf2_sss_raw', 'pwhf3_sss_raw',
+          'pwlf1_sss_raw', 'pwlf2_sss_raw', 'pwlf3_sss_raw',
+          'lfhf1_sss_raw', 'lfhf2_sss_raw', 'lfhf3_sss_raw']),
     13: (['rest_raw', 'rest2_raw',
-         'faces_raw',
-         'pwhf1_raw', 'pwhf2_raw', 'pwhf3_raw',
-         'pwlf1_raw', 'pwlf2_raw', 'pwlf3_raw',
-         'lfhf1_raw', 'lfhf2_avg', 'lfhf3_raw'],
+          'faces_raw',
+          'pwhf1_raw', 'pwhf2_raw', 'pwhf3_raw',
+          'pwlf1_raw', 'pwlf2_raw', 'pwlf3_raw',
+          'lfhf1_raw', 'lfhf2_avg', 'lfhf3_raw'],
          ['rest1_sss_raw', 'rest2_sss_raw',
-         'faces_sss_raw',
-         'pwhf1_sss_raw', 'pwhf2_sss_raw', 'pwhf3_sss_raw',
-         'pwlf1_sss_raw', 'pwlf2_sss_raw', 'pwlf3_sss_raw',
-         'lfhf1_sss_raw', 'lfhf2_sss_raw', 'lfhf3_sss_raw']),
+          'faces_sss_raw',
+          'pwhf1_sss_raw', 'pwhf2_sss_raw', 'pwhf3_sss_raw',
+          'pwlf1_sss_raw', 'pwlf2_sss_raw', 'pwlf3_sss_raw',
+          'lfhf1_sss_raw', 'lfhf2_sss_raw', 'lfhf3_sss_raw']),
     14: (['rest1_raw', 'rest2_raw',
-         'faces_raw',
-         'pwhf1_raw', 'pwhf2_raw', 'pwhf3_raw',
-         'pwlf1_raw', 'pwlf2_raw', 'pwlf3_raw',
-         'lfhf1_raw', 'lfhf2_raw', 'lfhf3_raw'],
+          'faces_raw',
+          'pwhf1_raw', 'pwhf2_raw', 'pwhf3_raw',
+          'pwlf1_raw', 'pwlf2_raw', 'pwlf3_raw',
+          'lfhf1_raw', 'lfhf2_raw', 'lfhf3_raw'],
          ['rest1_sss_raw', 'rest2_sss_raw',
-         'faces_sss_raw',
-         'pwhf1_sss_raw', 'pwhf2_sss_raw', 'pwhf3_sss_raw',
-         'pwlf1_sss_raw', 'pwlf2_sss_raw', 'pwlf3_sss_raw',
-         'lfhf1_sss_raw', 'lfhf2_sss_raw', 'lfhf3_sss_raw']),
+          'faces_sss_raw',
+          'pwhf1_sss_raw', 'pwhf2_sss_raw', 'pwhf3_sss_raw',
+          'pwlf1_sss_raw', 'pwlf2_sss_raw', 'pwlf3_sss_raw',
+          'lfhf1_sss_raw', 'lfhf2_sss_raw', 'lfhf3_sss_raw']),
     15: (['rest1_raw', 'rest2_raw',
-         'faces_raw',
-         'pwhf1_raw', 'pwhf2_raw', 'pwhf3_raw',
-         'pwlf1_raw', 'pwlf2_raw', 'pwlf3_raw',
-         'lfhf1_raw', 'lfhf2_raw', 'lfhf3_raw'],
+          'faces_raw',
+          'pwhf1_raw', 'pwhf2_raw', 'pwhf3_raw',
+          'pwlf1_raw', 'pwlf2_raw', 'pwlf3_raw',
+          'lfhf1_raw', 'lfhf2_raw', 'lfhf3_raw'],
          ['rest1_sss_raw', 'rest2_sss_raw',
-         'faces_sss_raw',
-         'pwhf1_sss_raw', 'pwhf2_sss_raw', 'pwhf3_sss_raw',
-         'pwlf1_sss_raw', 'pwlf2_sss_raw', 'pwlf3_sss_raw',
-         'lfhf1_sss_raw', 'lfhf2_sss_raw', 'lfhf3_sss_raw']),
+          'faces_sss_raw',
+          'pwhf1_sss_raw', 'pwhf2_sss_raw', 'pwhf3_sss_raw',
+          'pwlf1_sss_raw', 'pwlf2_sss_raw', 'pwlf3_sss_raw',
+          'lfhf1_sss_raw', 'lfhf2_sss_raw', 'lfhf3_sss_raw']),
     16: (['rest1_raw', 'rest2_raw',
-         'faces_raw',
-         'pwhf1_raw', 'pwhf2_raw', 'pwhf3_raw',
-         'pwlf1_raw', 'pwlf2_raw', 'pwlf3_raw',
-         'lfhf1_raw', 'lfhf2_raw', 'lfhf3_raw'],
+          'faces_raw',
+          'pwhf1_raw', 'pwhf2_raw', 'pwhf3_raw',
+          'pwlf1_raw', 'pwlf2_raw', 'pwlf3_raw',
+          'lfhf1_raw', 'lfhf2_raw', 'lfhf3_raw'],
          ['rest1_sss_raw', 'rest2_sss_raw',
-         'faces_sss_raw',
-         'pwhf1_sss_raw', 'pwhf2_sss_raw', 'pwhf3_sss_raw',
-         'pwlf1_sss_raw', 'pwlf2_sss_raw', 'pwlf3_sss_raw',
-         'lfhf1_sss_raw', 'lfhf2_sss_raw', 'lfhf3_sss_raw']),
+          'faces_sss_raw',
+          'pwhf1_sss_raw', 'pwhf2_sss_raw', 'pwhf3_sss_raw',
+          'pwlf1_sss_raw', 'pwlf2_sss_raw', 'pwlf3_sss_raw',
+          'lfhf1_sss_raw', 'lfhf2_sss_raw', 'lfhf3_sss_raw']),
     17: (['rest1_raw', 'rest2_raw',
-         'faces_raw',
-         'pwhf1_raw', 'pwhf2_raw', 'pwhf3_raw',
-         'pwlf1_raw', 'pwlf2_raw', 'pwlf3_raw',
-         'lfhf1_raw', 'lfhf2_raw', 'lfhf3_raw'],
+          'faces_raw',
+          'pwhf1_raw', 'pwhf2_raw', 'pwhf3_raw',
+          'pwlf1_raw', 'pwlf2_raw', 'pwlf3_raw',
+          'lfhf1_raw', 'lfhf2_raw', 'lfhf3_raw'],
          ['rest1_sss_raw', 'rest2_sss_raw',
-         'faces_sss_raw',
-         'pwhf1_sss_raw', 'pwhf2_sss_raw', 'pwhf3_sss_raw',
-         'pwlf1_sss_raw', 'pwlf2_sss_raw', 'pwlf3_sss_raw',
-         'lfhf1_sss_raw', 'lfhf2_sss_raw', 'lfhf3_sss_raw']),
+          'faces_sss_raw',
+          'pwhf1_sss_raw', 'pwhf2_sss_raw', 'pwhf3_sss_raw',
+          'pwlf1_sss_raw', 'pwlf2_sss_raw', 'pwlf3_sss_raw',
+          'lfhf1_sss_raw', 'lfhf2_sss_raw', 'lfhf3_sss_raw']),
     18: (['rest1_raw', 'rest2_raw',
-         'faces_raw',
-         'pwhf1_raw', 'pwhf2_raw', 'pwhf3_raw',
-         'pwlf1_raw', 'pwlf2_raw', 'pwlf3_raw',
-         'lfhf1_raw', 'lfhf2_rw', 'lfhf3_raw'],
+          'faces_raw',
+          'pwhf1_raw', 'pwhf2_raw', 'pwhf3_raw',
+          'pwlf1_raw', 'pwlf2_raw', 'pwlf3_raw',
+          'lfhf1_raw', 'lfhf2_rw', 'lfhf3_raw'],
          ['rest1_sss_raw', 'rest2_sss_raw',
-         'faces_sss_raw',
-         'pwhf1_sss_raw', 'pwhf2_sss_raw', 'pwhf3_sss_raw',
-         'pwlf1_sss_raw', 'pwlf2_sss_raw', 'pwlf3_sss_raw',
-         'lfhf1_sss_raw', 'lfhf2_sss_raw', 'lfhf3_sss_raw'])
+          'faces_sss_raw',
+          'pwhf1_sss_raw', 'pwhf2_sss_raw', 'pwhf3_sss_raw',
+          'pwlf1_sss_raw', 'pwlf2_sss_raw', 'pwlf3_sss_raw',
+          'lfhf1_sss_raw', 'lfhf2_sss_raw', 'lfhf3_sss_raw'])
 }
 
 
@@ -303,30 +308,30 @@ bad_channels = {
         'meg': ['MEG1711', 'MEG2312', 'MEG0813', 'MEG2311']},
     6: {'eeg': ['EEG023', 'EEG040', 'EEG043'],
         'meg': ['MEG2323', 'MEG0813']},
-    7: {'eeg': ['EEG019','EEG023'],
+    7: {'eeg': ['EEG019', 'EEG023'],
         'meg': ['MEG0233', 'MEG1121', 'MEG0813', 'MEG1123']},
     8: {'eeg': ['EEG004', 'EEG018', 'EEG029', 'EEG039', 'EEG050'],
         'meg': []},
     9: {'eeg': [],
         'meg': ['MEG0813']},
     10: {'eeg': [],
-        'meg': ['MEG1131']},
+         'meg': ['MEG1131']},
     11: {'eeg': [],
-        'meg': ['MEG0813']},
+         'meg': ['MEG0813']},
     12: {'eeg': ['EEG029', 'EEG048'],
-        'meg': ['MEG0813']},
+         'meg': ['MEG0813']},
     13: {'eeg': ['EEG039', 'EEG050'],
-        'meg': ['MEG1222']},
+         'meg': ['MEG1222']},
     14: {'eeg': ['EEG032', 'EEG045', 'EEG047'],           # need to check how it looks with this channel interpolation
-        'meg': ['MEG2642', 'MEG0412', 'MEG1713', 'MEG2312', 'MEG2323']},
+         'meg': ['MEG2642', 'MEG0412', 'MEG1713', 'MEG2312', 'MEG2323']},
     15: {'eeg': [],
-        'meg': ['MEG2511', 'MEG0813', 'MEG0933']},
+         'meg': ['MEG2511', 'MEG0813', 'MEG0933']},
     16: {'eeg': ['EEG045'],
-        'meg': ['MEG1322', 'MEG2223']},
+         'meg': ['MEG1322', 'MEG2223']},
     17: {'eeg': ['EEG039', 'EEG048', 'EEG050', 'EEG055'],
-        'meg': ['MEG0813', 'MEG1712']},
+         'meg': ['MEG0813', 'MEG1712']},
     18: {'eeg': ['EEG008', 'EEG021', 'EEG029', 'EEG045'],
-        'meg': ['MEG2323', 'MEG1943', 'MEG1741']},
+         'meg': ['MEG2323', 'MEG1943', 'MEG1741']},
 
 }
 
@@ -353,11 +358,13 @@ for ss in map_subjects:
     if not op.isdir(subj_dir_stc):
         print('Creating directory %s.' % subj_dir_stc)
         os.mkdir(subj_dir_stc)
-    fig_dir = op.join(data_path, map_subjects[ss][0], 'Figures')  # subject figure dir
+    fig_dir = op.join(data_path, map_subjects[ss][
+                      0], 'Figures')  # subject figure dir
     if not op.isdir(fig_dir):
         print('Creating directory %s.' % fig_dir)
         os.mkdir(fig_dir)
-    fig_dir = op.join(data_path, map_subjects[ss][0], 'Figures_ICA')  # subject figure dir
+    fig_dir = op.join(data_path, map_subjects[ss][
+                      0], 'Figures_ICA')  # subject figure dir
     if not op.isdir(fig_dir):
         print('Creating directory %s.' % fig_dir)
         os.mkdir(fig_dir)
@@ -447,6 +454,8 @@ fpvs_sweep_duration = 12.
 
 # event markers for run onsets
 fpvs_event_ids = [14, 15, 16, 17]
+# event marker(s) for catch trials (responses)
+fpvs_catch_ids = [8]
 
 # Frequencies for PSD plots
 # # frequencies as times in seconds
@@ -482,18 +491,18 @@ n_peak = 4
 # parameters for Neuromag maxfilter command
 # Make sure to use Vectorview files!
 MF = {
-     'NM_cmd': '/imaging/local/software/neuromag/bin/util/maxfilter-2.2.12',
-     'cal': '/neuro/databases_vectorview/sss/sss_cal.dat',
-     'ctc': '/neuro/databases_vectorview/ctc/ct_sparse.fif',
-     'st_duration': 10.,
-     'st_correlation': 0.98,
-     'origin': (0., 0., 0.045),
-     'in': 8,
-     'out': 3,
-     'regularize': 'in',
-     'frame': 'head',
-     'mv': 'inter',
-     'trans': 6}  # which file to use for -trans within subject
+    'NM_cmd': '/imaging/local/software/neuromag/bin/util/maxfilter-2.2.12',
+    'cal': '/neuro/databases_vectorview/sss/sss_cal.dat',
+    'ctc': '/neuro/databases_vectorview/ctc/ct_sparse.fif',
+    'st_duration': 10.,
+    'st_correlation': 0.98,
+    'origin': (0., 0., 0.045),
+    'in': 8,
+    'out': 3,
+    'regularize': 'in',
+    'frame': 'head',
+    'mv': 'inter',
+    'trans': 6}  # which file to use for -trans within subject
 
 # for correcting EEG electrode positions
 check_cmd = '/imaging/local/software/mne/mne_2.7.3/x86_64/\
@@ -512,10 +521,21 @@ l_freq, h_freq = 0.1, 140.
 # "OT": right: channels P10; P8; PO8; PO10; PO12;
 #       and left: P9; P7; PO7; PO9; PO11
 # "MO": O2; POI2; I2; Iz; OIz; Oz; POOz; O1; POI1; I1
-electrode_ROIs = {}
-electrode_ROIs['OT_R'] = ['EEG065', 'EEG060', 'EEG070', 'EEG003']  # we don't have PO12
-electrode_ROIs['OT_L'] = ['EEG051', 'EEG052', 'EEG066', 'EEG001']
-electrode_ROIs['MO'] = ['EEG073', 'EEG074', 'EEG072', 'EEG071']  # we only have O2, IZ, Oz, O1
+channel_ROIs = {}
+channel_ROIs['OT_R'] = ['EEG065', 'EEG060',
+                        'EEG070', 'EEG003']  # we don't have PO12
+channel_ROIs['OT_L'] = ['EEG051', 'EEG052', 'EEG066', 'EEG001']
+channel_ROIs['MO'] = ['EEG073', 'EEG074', 'EEG072',
+                      'EEG071']  # we only have O2, IZ, Oz, O1
+# MEG sensor groups, mags and grads, channel names will be added later
+meg_selections = ['Left-occipital', 'Right-occipital']
+for sel in meg_selections:
+    channel_ROIs['Mag ' + sel] = []
+    channel_ROIs['Grad ' + sel] = []
+# available MEG channel selections:
+# ['Vertex', 'Left-temporal', 'Right-temporal', 'Left-parietal',
+#                  'Right-parietal', 'Left-occipital', 'Right-occipital',
+#                  'Left-frontal', 'Right-frontal']
 
 ###
 # TFR
@@ -537,7 +557,7 @@ delay = 0.0345
 # separate triggers for target detection and localiser tasks
 event_id = {}
 
-### Source Space
+# Source Space
 stc_morph = 'fsaverage'
 
 # vertex size

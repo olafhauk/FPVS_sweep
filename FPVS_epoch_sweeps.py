@@ -51,9 +51,12 @@ def run_epoch_sweeps(sbj_id):
 
     # initialise for data at different sweep frequencies
     epochs = {}
+    behaviour = {}  # collect response times for catch trials
     for cond in conds:
 
         epochs[cond] = {}
+        # reponse times and number of catch trials
+        behaviour[cond] = {'rts': [], 'N': 0}  # across frequency sweeps
 
         if cond == 'face':
 
@@ -193,6 +196,22 @@ def run_epoch_sweeps(sbj_id):
                         # append for each run and frequency
                         epochs[raw_stem_in[:4]][str(ff)].append(epos)
 
+                # Finally... get response times for catch trials
+                # events of colour changes
+                catch_eves = np.where(
+                    [(ee in config.fpvs_catch_ids) for ee in events[:, -1]])[0]
+                behaviour[cond]['N'] += len(catch_eves)
+                # button press events
+                resp_eves = np.where(events[:, -1] > 1000)[0]
+                for cc in catch_eves:
+                    rt_diffs = (events[resp_eves, 0] - events[cc, 0]) / epos.info['sfreq']
+                    # find earliest button press after catch trial event within 3s
+                    rt_min = rt_diffs[(rt_diffs > 0) & (rt_diffs < 3.)]
+
+                    # pick earliest response after response within limit
+                    if len(rt_min) != 0:
+                        behaviour[cond]['rts'].append(rt_min.min())
+
         # Concatenate epochs across runs
         # write the result as fiff-file
         for cond in epochs.keys():  # conditions
@@ -210,6 +229,10 @@ def run_epoch_sweeps(sbj_id):
                 print('Writing epochs to %s.' % epo_fname)
 
                 epochs_conc.save(epo_fname, overwrite=True)
+
+            rt = np.mean(behaviour[cond]['rts'])
+            print('Average response time and correct rate for catch trials: '
+                  '%f, %f' % (rt, len(behaviour[cond]['rts']) / behaviour[cond]['N']))
 
     return
 

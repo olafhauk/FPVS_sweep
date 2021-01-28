@@ -82,6 +82,7 @@ if 'ica' in config.raw_ICA_suff:
 
 # all psd results for evoked and STC
 # individual subjects and GM
+
 modals = ['evo', 'stc']
 gm_modals = ['evo_gm', 'stc_gm']
 # modals = ['stc']
@@ -104,6 +105,36 @@ stc_types = ['psd', 'psd_sum_odd', 'psd_sum_base', 'psd_harm_odd',
 # conditions
 # conds = ['face', 'pwhf', 'pwlf', 'lfhf']
 conds = config.do_conds
+
+# Labels for ROI analysis
+subjects_dir = config.subjects_dir
+mne.datasets.fetch_hcp_mmp_parcellation(subjects_dir=subjects_dir,
+                                        verbose=True)
+
+labels = mne.read_labels_from_annot('fsaverage', 'HCPMMP1', 'both',
+                                    subjects_dir=subjects_dir)
+
+label_names = {}
+# list of list: labels within sub-lists will be combined
+# number of items must correpond for 'lh' and 'rh'
+label_names['lh'] = [['L_FFC_ROI-lh'], ['L_VVC_ROI-lh'], ['L_V4_ROI-lh'],
+                     ['L_VMV3_ROI-lh'], ['L_TE2p_ROI-lh'], ['L_V1_ROI-lh']]
+label_names['rh'] = [['R_FFC_ROI-rh'], ['R_VVC_ROI-rh'], ['R_V4_ROI-rh'],
+                     ['R_VMV3_ROI-rh'], ['R_TE2p_ROI-rh'], ['R_V1_ROI-rh']]
+
+# get subset of labels specified in labels_ATL
+my_labels = {'lh': [], 'rh': []}
+for hh in ['lh', 'rh']:
+    for nn in label_names[hh]:
+        tmp = [label for label in labels if label.name == nn[0]][0]
+        if len(nn) > 1:
+            for n in nn[1:]:
+                tmp = tmp + [label for label in labels if label.name == n][0]
+        my_labels[hh].append(tmp)
+
+# Read fsaverage source space for labels
+src = mne.read_source_spaces(
+    '/group/erp/data/olaf.hauk/MEG/FPVS/data_Federica/MRI/fsaverage/bem/fsaverage-ico-5-src.fif')
 
 
 def grand_average_psds(sbj_ids):
@@ -153,7 +184,8 @@ def grand_average_psds(sbj_ids):
 
                 if cond == 'face':  # no frequency sweep for faces
 
-                    freqs = ['6.0']  # base frequency for this condition (Hz as string)
+                    # base frequency for this condition (Hz as string)
+                    freqs = ['6.0']
 
                 else:  # for all word condition, use all sweep frequencies
 
@@ -165,18 +197,18 @@ def grand_average_psds(sbj_ids):
                     psds[modal][tt][cond][freq] = []  # subjects
 
     # initialise array for electrode ROIs for group statistics
-    roi_elecs = {}
-    for roi in config.electrode_ROIs:
+    roi_chans_rms = {}
+    for roi in config.channel_ROIs:
 
-        roi_elecs[roi] = {}
+        roi_chans_rms[roi] = {}
 
         for cond in conds:
 
-            roi_elecs[roi][cond] = {}
+            roi_chans_rms[roi][cond] = {}
 
             if cond == 'face':  # no frequency sweep for faces
 
-                freqs = ['6.0']  # base frequency for this condition (Hz as string)
+                freqs = ['6.0']  # base frequency for this condition (Hz)
 
             else:  # for all word condition, use all sweep frequencies
 
@@ -185,8 +217,9 @@ def grand_average_psds(sbj_ids):
 
             for freq in freqs:
 
-                roi_elecs[roi][cond][freq] = {'odd': np.zeros(len(sbj_ids)),
-                                              'base': np.zeros(len(sbj_ids))}
+                roi_chans_rms[roi][cond][freq] = {
+                    'odd': np.zeros(len(sbj_ids)),
+                    'base': np.zeros(len(sbj_ids))}
 
     # Reading evoked data, getting data for channel groups
     if 'evo' in modals:
@@ -222,55 +255,122 @@ def grand_average_psds(sbj_ids):
 
                 print('Reading PSD results from evoked files:')
 
+                # PSD (raw):
+                # fname_evo = op.join(sbj_path, 'AVE', 'PSD_%s%s' % (cond, '-ave.fif'))
+                # print(fname_evo)
+                # mne.write_evokeds(fname_evo, psd_all)
+
+                # # PSD (z-scored):
+                # fname_evo = op.join(sbj_path, 'AVE', 'PSDZ_%s%s' % (cond, '-ave.fif'))
+                # print(fname_evo)
+                # mne.write_evokeds(fname_evo, psd_z_all)
+
+                # # Sum PSD segments around harmonics of oddball frequency then z-score:
+                # fname_evo = op.join(sbj_path, 'AVE', 'HarmOdd_%s%s' %
+                #                     (cond, '-ave.fif'))
+                # print(fname_evo)
+                # mne.write_evokeds(fname_evo, psd_harm_all)
+
+                # # Sum PSD segments around harmonics of base frequency then z-score:
+                # fname_evo = op.join(sbj_path, 'AVE', 'HarmBase_%s%s' %
+                #                     (cond, '-ave.fif'))
+                # print(fname_evo)
+                # mne.write_evokeds(fname_evo, psd_harm_base_all)
+
+                # # Oddball topography of z-scored summed harmonics at centre frequency:
+                # fname_evo = op.join(sbj_path, 'AVE', 'SumTopoOdd_%s%s' %
+                #                     (cond, '-ave.fif'))
+                # print(fname_evo)
+                # mne.write_evokeds(fname_evo, sum_harms_odd_all)
+
+                # # Base topography of z-scored summed harmonics at centre frequency:
+                # fname_evo = op.join(sbj_path, 'AVE', 'SumTopoBase_%s%s' %
+                #                     (cond, '-ave.fif'))
+                # print(fname_evo)
+                # mne.write_evokeds(fname_evo, sum_harms_base_all)
+
+                # # Oddball topographies at centre frequencies for individual harmonics:
+                # fname_evo = op.join(sbj_path, 'AVE', 'SumToposOdd_%s%s' %
+                #                     (cond, '-ave.fif'))
+                # print(fname_evo)
+                # mne.write_evokeds(fname_evo, topos_odd_all)
+
+                # # Base topographies at centre frequencies for individual harmonics:
+                # fname_evo = op.join(sbj_path, 'AVE', 'SumToposBase_%s%s' %
+                #                     (cond, '-ave.fif'))
+                # print(fname_evo)
+                # mne.write_evokeds(fname_evo, topos_base_all)
+
                 # Read Evoked
 
+                # PSD (raw):
                 fname_evo =\
-                    op.join(sbj_path, 'AVE', '%sPSDTopo_%s%s' %
-                            (prefix, cond, '-ave.fif'))
+                    op.join(sbj_path, 'AVE', 'PSD_%s%s' % (cond, '-ave.fif'))
                 print(fname_evo)
                 psd = mne.read_evokeds(fname_evo)
 
+                # PSD (z-scored):
                 fname_evo =\
-                    op.join(sbj_path, 'AVE', '%sPSDTopoZ_%s%s' %
-                            (prefix, cond, '-ave.fif'))
+                    op.join(sbj_path, 'AVE', 'PSDZ_%s%s' % (cond, '-ave.fif'))
                 print(fname_evo)
                 psd_z = mne.read_evokeds(fname_evo)
 
+                # Sum PSD segments around harmonics of oddball frequency then
+                # z-score:
                 fname_evo =\
-                    op.join(sbj_path, 'AVE', '%sPSDHarm_%s%s' %
-                            (prefix, cond, '-ave.fif'))
+                    op.join(sbj_path, 'AVE', 'HarmOdd_%s%s' %
+                            (cond, '-ave.fif'))
                 print(fname_evo)
                 psd_harm_odd = mne.read_evokeds(fname_evo)
 
+                # Sum PSD segments around harmonics of base frequency then
+                # z-score:
                 fname_evo = \
-                    op.join(sbj_path, 'AVE', '%sPSDHarmBase_%s%s' %
-                            (prefix, cond, '-ave.fif'))
+                    op.join(sbj_path, 'AVE', 'HarmBase_%s%s' %
+                            (cond, '-ave.fif'))
                 print(fname_evo)
                 psd_harm_base = mne.read_evokeds(fname_evo)
 
+                # Oddball topography of z-scored summed harmonics at centre
+                # frequency:
                 fname_evo =\
-                    op.join(sbj_path, 'AVE', '%sPSDSumTopoOdd_%s%s' %
-                            (prefix, cond, '-ave.fif'))
+                    op.join(sbj_path, 'AVE', 'SumTopoOdd_%s%s' %
+                            (cond, '-ave.fif'))
                 print(fname_evo)
                 psd_sum_odd = mne.read_evokeds(fname_evo)
 
+                # Base topography of z-scored summed harmonics at centre
+                # frequency:
                 fname_evo =\
-                    op.join(sbj_path, 'AVE', '%sPSDSumTopoBase_%s%s' %
-                            (prefix, cond, '-ave.fif'))
+                    op.join(sbj_path, 'AVE', 'SumTopoBase_%s%s' %
+                            (cond, '-ave.fif'))
                 print(fname_evo)
                 psd_sum_base = mne.read_evokeds(fname_evo)
 
+                # Oddball topographies at centre frequencies for individual
+                # harmonics:
                 fname_evo =\
-                    op.join(sbj_path, 'AVE', '%sPSDSumToposOdd_%s%s' %
-                            (prefix, cond, '-ave.fif'))
+                    op.join(sbj_path, 'AVE', 'SumToposOdd_%s%s' %
+                            (cond, '-ave.fif'))
                 print(fname_evo)
                 psd_harm_topos_odd = mne.read_evokeds(fname_evo)
 
+                # Base topographies at centre frequencies for individual
+                # harmonics:
                 fname_evo =\
-                    op.join(sbj_path, 'AVE', '%sPSDSumToposBase_%s%s' %
-                            (prefix, cond, '-ave.fif'))
+                    op.join(sbj_path, 'AVE', 'SumToposBase_%s%s' %
+                            (cond, '-ave.fif'))
                 print(fname_evo)
                 psd_harm_topos_base = mne.read_evokeds(fname_evo)
+
+                # Add MEG channel groups to channel_ROIs
+                for roi in config.meg_selections:
+                    ch_names = mne.read_selection(name=roi, info=psd[0].info)
+                    for cn in ch_names:
+                        if cn[-1] == '1':
+                            config.channel_ROIs['Mag ' + roi].append(cn)
+                        else:
+                            config.channel_ROIs['Grad ' + roi].append(cn)
 
                 for (fi, freq) in enumerate(freqs):
 
@@ -280,17 +380,23 @@ def grand_average_psds(sbj_ids):
 
                     psds[modal]['psd_z'][cond][freq].append(psd_z[fi])
 
-                    psds[modal]['psd_sum_odd'][cond][freq].append(psd_sum_odd[fi])
+                    psds[modal]['psd_sum_odd'][cond][
+                        freq].append(psd_sum_odd[fi])
 
-                    psds[modal]['psd_sum_base'][cond][freq].append(psd_sum_base[fi])
+                    psds[modal]['psd_sum_base'][cond][
+                        freq].append(psd_sum_base[fi])
 
-                    psds[modal]['psd_harm_topos_odd'][cond][freq].append(psd_harm_topos_odd[fi])
+                    psds[modal]['psd_harm_topos_odd'][cond][
+                        freq].append(psd_harm_topos_odd[fi])
 
-                    psds[modal]['psd_harm_topos_base'][cond][freq].append(psd_harm_topos_base[fi])
+                    psds[modal]['psd_harm_topos_base'][cond][
+                        freq].append(psd_harm_topos_base[fi])
 
-                    psds[modal]['psd_harm_odd'][cond][freq].append(psd_harm_odd[fi])
+                    psds[modal]['psd_harm_odd'][cond][
+                        freq].append(psd_harm_odd[fi])
 
-                    psds[modal]['psd_harm_base'][cond][freq].append(psd_harm_base[fi])
+                    psds[modal]['psd_harm_base'][cond][
+                        freq].append(psd_harm_base[fi])
 
                     # hack, float-to-string-to-float-again
                     # to be consistent with FPVS_PSD_sweep_plot.py
@@ -319,7 +425,8 @@ def grand_average_psds(sbj_ids):
                     peak_ch_names_base = []
                     for chtype in peak_ch_types_base[0]:
 
-                        peak_ch_names_base = peak_ch_names_base + peak_ch_types_base[0][chtype]
+                        peak_ch_names_base = peak_ch_names_base + \
+                            peak_ch_types_base[0][chtype]
 
                     # Find channels with maximum Z-scores per channel type
                     # for oddball frequency
@@ -337,7 +444,8 @@ def grand_average_psds(sbj_ids):
                     peak_ch_names_odd = []
                     for chtype in peak_ch_types_odd[0]:
 
-                        peak_ch_names_odd = peak_ch_names_odd + peak_ch_types_odd[0][chtype]
+                        peak_ch_names_odd = peak_ch_names_odd + \
+                            peak_ch_types_odd[0][chtype]
 
                     #
 
@@ -441,9 +549,9 @@ def grand_average_psds(sbj_ids):
 
                     # Get data for group statistics (e.g. laterality)
                     # RMS across electrodes in ROI
-                    for roi in config.electrode_ROIs:
+                    for roi in config.channel_ROIs:
 
-                        ch_names = config.electrode_ROIs[roi]
+                        ch_names = config.channel_ROIs[roi]
 
                         for stim in ['base', 'odd']:
 
@@ -456,9 +564,9 @@ def grand_average_psds(sbj_ids):
 
                             idx0 = evoked_roi.time_as_index(0.)
 
-                            roi_rms = np.sqrt((evoked_roi.data[:, idx0]**2).mean())
+                            rms = np.sqrt((evoked_roi.data[:, idx0]**2).mean())
 
-                            roi_elecs[roi][cond][freq][stim][ss] = roi_rms
+                            roi_chans_rms[roi][cond][freq][stim][ss] = rms
 
     # Reading source estimate (STC) data
     if 'stc' in modals:
@@ -582,6 +690,34 @@ def grand_average_psds(sbj_ids):
 
                     stc_avg.save(fname_stc)
 
+                    # Extract label amplitudes
+                    if tt in ['psd_harm_odd', 'psd_harm_base']:
+                        amps = {'lh': [], 'rh': []}
+                        idx0 = np.abs(stc.times).argmin()
+                        for hh in ['lh', 'rh']:
+                            amps[hh] = {}
+                            for ll in my_labels[hh]:
+                                amps[hh][ll.name] = []
+                                for stc in stcs:
+                                    aa = mne.source_estimate.extract_label_time_course(
+                                        stcs=stc, labels=ll, src=src, mode='max')
+                                    aa = aa[0, idx0]
+                                    amps[hh][ll.name].append(aa)
+
+                        # t-test
+                        print(tt)
+                        for [li, ll] in enumerate(my_labels['lh']):
+                            print(ll.name)
+                            data1 = amps['lh'][my_labels['lh'][li].name]
+                            data2 = amps['rh'][my_labels['rh'][li].name]
+
+                            stat, pv = ttest_rel(data1, data2)
+
+                            print('T-test for L-R, %s | %s (%f vs %f).' %
+                                  (cond, freq, np.mean(data1), np.mean(data2)))
+                            # p-value
+                            print('%f, %f\n' % (stat, pv))
+
     # Compute Grand-Averages for Evoked data
 
     # Path for grand-mean results
@@ -656,20 +792,32 @@ def grand_average_psds(sbj_ids):
                     mne.write_evokeds(fname=fname_evo, evoked=evoked)
 
             # Group Statistics for electrode ROIs
+            # Channel group pairs to compare:
+            group_pairs = {'EEG': ['OT_L', 'OT_R'],
+                           'Grad': ['Grad Left-occipital',
+                                    'Grad Right-occipital'],
+                           'Mag': ['Mag Left-occipital',
+                                   'Mag Right-occipital']}
             for freq in freqs:
 
                 for stim in ['base', 'odd']:
 
-                    print('\nEEG laterality statistics for %s.' % stim)
+                    print('\nLaterality statistics for %s.' % stim)
 
-                    data1 = roi_elecs['OT_L'][cond][freq][stim]
-                    data2 = roi_elecs['OT_R'][cond][freq][stim]
+                    for ct in group_pairs:
+                        print(ct)
 
-                    stat, pv = ttest_rel(data1, data2)
+                        g1, g2 = group_pairs[ct][0], group_pairs[ct][1]
+                        data1 = roi_chans_rms[g1][cond][freq][stim]
+                        data2 = roi_chans_rms[g2][cond][freq][stim]
 
-                    print('T-test for L-R, %s | %s (%f vs %f).' %
-                          (cond, freq, data1.mean(), data2.mean()))
-                    print('%f, %f\n' % (stat, pv))
+                        # Two-sided t-test
+                        stat, pv = ttest_rel(data1, data2)
+
+                        print('T-test for %s L-R, %s | %s (%f vs %f).' %
+                              (ct, cond, freq, data1.mean(), data2.mean()))
+                        # p-value for one-sided test justified here
+                        print('%f, %f\n' % (stat, pv / 2.))
 
             # plot peak amplitudes across individual participants
             for freq in freqs:
@@ -697,7 +845,8 @@ def grand_average_psds(sbj_ids):
                         ax.plot([0., n], [threshold, threshold], "k--")
 
                         # output directory for figures
-                        figs_path = op.join(config.grandmean_path, 'Figures_ICA')
+                        figs_path = op.join(
+                            config.grandmean_path, 'Figures_ICA')
 
                         fig_fname = op.join(
                             figs_path, 'face_amps_indiv_%s_%s.jpg' % (stim, ch_type))
@@ -711,15 +860,20 @@ def grand_average_psds(sbj_ids):
                     # put amplitudes into list of lists for correlation
                     amps_list = [amps['eeg'], amps['grad'], amps['mag']]
 
-                    corrs = np.corrcoef(amps_list)
-
                     print('Condition: %s.' % stim)
 
                     print('Correlations of peak amplitudes between channel'
                           ' types across participants:')
+                    corrs = np.corrcoef(amps_list)
                     print(corrs)
 
-
+                    print('Correlation confidence intervals:')
+                    r, p, lo, hi = Ff.pearsonr_ci(amps['eeg'], amps['grad'])
+                    print('EEG vs Grads: %f, %f\n' % (lo, hi))
+                    r, p, lo, hi = Ff.pearsonr_ci(amps['eeg'], amps['mag'])
+                    print('EEG vs Mags: %f, %f\n' % (lo, hi))
+                    r, p, lo, hi = Ff.pearsonr_ci(amps['mag'], amps['grad'])
+                    print('Mags vs Grads: %f, %f\n' % (lo, hi))
 
         # FOR FACES ONLY, put topographies for individual subjects together
         evos = psds['evo']['psd_sum_odd']['face']['6.0']
@@ -935,7 +1089,7 @@ def grand_average_conditions_evo(evos):
 # get all input arguments except first
 # if number not in config list, do all of them
 if ((len(sys.argv) == 1) or
-   (int(sys.argv[1]) > np.max(list(config.map_subjects.keys())))):
+        (int(sys.argv[1]) > np.max(list(config.map_subjects.keys())))):
 
     # IDs don't start at 0
     sbj_ids = config.do_subjs
@@ -945,6 +1099,8 @@ else:
     # get list of subjects IDs to process
     sbj_ids = [int(aa) for aa in sys.argv[1:]]
 
+# # EDIT
+# sbj_ids = sbj_ids[:2]
 
 # requires all subjects to average across
 grand_average_psds(sbj_ids)

@@ -113,7 +113,7 @@ def run_maxfilter(sbj_id):
         print('Maxfilter command: %s' % mf_cmd)
 
         # Execute maxfilter command
-        os.system(mf_cmd)
+        # os.system(mf_cmd)
 
 # get all input arguments except first
 if len(sys.argv) == 1:

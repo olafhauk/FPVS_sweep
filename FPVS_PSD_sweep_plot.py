@@ -117,33 +117,31 @@ def run_PSD_plot(sbj_id):
         if 'ica' in config.raw_ICA_suff:
             prefix = 'ICA'
 
-        fname_evo = op.join(sbj_path, 'AVE', '%sPSDTopo_%s%s' %
-                            (prefix, cond, '-ave.fif'))
+        fname_evo = op.join(sbj_path, 'AVE', 'PSD_%s%s' % (cond, '-ave.fif'))
         print(fname_evo)
         psds_as_evo = mne.read_evokeds(fname_evo)
 
-        fname_evo = op.join(sbj_path, 'AVE', '%sPSDTopoZ_%s%s' %
-                            (prefix, cond, '-ave.fif'))
+        fname_evo = op.join(sbj_path, 'AVE', 'PSDZ_%s%s' % (cond, '-ave.fif'))
         print(fname_evo)
         psds_z_as_evo = mne.read_evokeds(fname_evo)
 
-        fname_evo = op.join(sbj_path, 'AVE', '%sPSDHarm_%s%s' %
-                            (prefix, cond, '-ave.fif'))
+        fname_evo = op.join(sbj_path, 'AVE', 'HarmOdd_%s%s' %
+                            (cond, '-ave.fif'))
         print(fname_evo)
         psd_harm_as_evo = mne.read_evokeds(fname_evo)
 
-        fname_evo = op.join(sbj_path, 'AVE', '%sPSDHarmBase_%s%s' %
-                            (prefix, cond, '-ave.fif'))
+        fname_evo = op.join(sbj_path, 'AVE', 'HarmBase_%s%s' %
+                            (cond, '-ave.fif'))
         print(fname_evo)
         psd_harm_base_as_evo = mne.read_evokeds(fname_evo)
 
-        fname_evo = op.join(sbj_path, 'AVE', '%sPSDSumTopoOdd_%s%s' %
-                            (prefix, cond, '-ave.fif'))
+        fname_evo = op.join(sbj_path, 'AVE', 'SumTopoOdd_%s%s' %
+                            (cond, '-ave.fif'))
         print(fname_evo)
         sum_odd_as_evo = mne.read_evokeds(fname_evo)
 
-        fname_evo = op.join(sbj_path, 'AVE', '%sPSDSumTopoBase_%s%s' %
-                            (prefix, cond, '-ave.fif'))
+        fname_evo = op.join(sbj_path, 'AVE', 'SumTopoBase_%s%s' %
+                            (cond, '-ave.fif'))
         print(fname_evo)
         sum_base_as_evo = mne.read_evokeds(fname_evo)
 

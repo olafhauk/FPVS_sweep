@@ -29,8 +29,8 @@ reload(config)
 
 print(mne.__version__)
 
-# perform TFR of raw data or not - outdated
-do_tfr = config.do_tfr
+# conditions
+conds = config.do_conds
 
 close_fig = 1  # close figures only if close_fig==1
 
@@ -51,13 +51,20 @@ def run_get_sweeps(sbj_id):
     sbj_path = op.join(config.data_path, config.map_subjects[sbj_id][0])
 
     # raw-filename mappings for this subject
-    sss_map_fname = config.sss_map_fnames[sbj_id]
+    tmp_fnames = config.sss_map_fnames[sbj_id][1]
+
+    # only use files for correct conditions
+    sss_map_fnames = []
+    for cond in conds:
+        for [fi, ff] in enumerate(tmp_fnames):
+            if cond in ff:
+                sss_map_fnames.append(ff)
 
     # initialise dict for results
     # one dict per condition (e.g. 'hflf'), then for frequency (e.g. '12.'),
     # then list of individual sweeps
     names = []  # names of conditions
-    for raw_stem_in in sss_map_fname[1][2:]:
+    for raw_stem_in in sss_map_fnames:
 
         names.append(raw_stem_in[:4])
 
@@ -81,7 +88,7 @@ def run_get_sweeps(sbj_id):
                 data_runs[name][str(freq)] = []
 
     # Note: Skip first two files since they are rest, no events
-    for raw_stem_in in sss_map_fname[1][2:]:
+    for raw_stem_in in sss_map_fnames:
 
         # omit "_raw" in middle of filename
         raw_fname_in = op.join(sbj_path, raw_stem_in[:-4] + '_f_' +

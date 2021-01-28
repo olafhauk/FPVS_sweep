@@ -46,25 +46,25 @@ job_list = [
     #  'mem': '1G',                    # memory for qsub process
     #  'dep': ''},                       # name of preceeding process (optional)
 
-    ### Filter raw data
-    {'N':   'F_FR',                  # job name
-     'Py':  'FPVS_filter_raw_sweep',          # Python script
-     'Ss':  subjs,                    # subject indices
-     'mem': '16G',                    # memory for qsub process
-     'dep': ''},                      # name of preceeding process (optional)
+    # ### Pre-processing
 
-    # # ### Filter raw data FM-> generating also txt event file
-    # # {'N':   'F_FR',                  # job name
-    # #  'Py':  'FPVS_filter_raw_sweep_txtfile',          # Python script
-    # #  'Ss':  subjs,                    # subject indices
-    # #  'mem': '16G',                    # memory for qsub process
-    # #  'dep': 'F_FR'},                      # name of preceeding process (optional)
+    # ### Filter raw data
+    # {'N':   'F_FR',                  # job name
+    #  'Py':  'FPVS_filter_raw_sweep',          # Python script
+    #  'Ss':  subjs,                    # subject indices
+    #  'mem': '16G',                    # memory for qsub process
+    #  'dep': ''},                      # name of preceeding process (optional)
+    # {'N':   'F_Cov',                  # job name
+    #  'Py':  'FPVS_make_covmat',          # Python script
+    #  'Ss':  subjs,                    # subject indices
+    #  'mem': '4G',                    # memory for qsub process
+    #  'dep': 'F_FR'},
 
     # #  ### Compute ICA
     # {'N':   'F_CICA',                  # job name
     #  'Py':  'FPVS_Compute_ICA_sweep',          # Python script
     #  'Ss':  subjs,                    # subject indices
-    #  'mem': '64G',                    # memory for qsub process
+    #  'mem': '96G',                    # memory for qsub process
     #  'dep': 'F_FR'},                      # name of preceeding process (optional)
     #   ### Apply ICA (change ica_suff in config_sweep.py if necessary)
     # {'N':   'F_AICA',                  # job name
@@ -73,15 +73,15 @@ job_list = [
     #  'mem': '2G',                    # memory for qsub process
     #  'dep': 'F_CICA'},                      # name of preceeding process (optional)
 
-
     # ## Get sweeps from raw data and average (change ica_suff in config_sweep.py if necessary)
     # {'N':   'F_GS',                  # job name
     #  'Py':  'FPVS_get_sweeps',          # Python script
     #  'Ss':  subjs,                    # subject indices
     #  'mem': '8G',                    # memory for qsub process
-    #  'dep': ''},
-    
-    # ### Get epochs from sweeps for ERP analysis
+    #  'dep': 'F_AICA'},
+
+    # ### Evoked analysis
+    # # Get epochs from sweeps for ERP analysis
     # # lots of epochs, needs enough memory
     # {'N':   'F_EPO',                  # job name
     #  'Py':  'FPVS_epoch_sweeps',          # Python script
@@ -105,10 +105,42 @@ job_list = [
     #  'Py':  'FPVS_source_estimation_evoked',          # Python script
     #  'Ss':  subjs,                    # subject indices
     #  'mem': '2G',                    # memory for qsub process
-    #  'dep': 'F_EVO'},
+    #  'dep': ''},
+
+    # ### Source Estimation
+    # ### Create Source Spaces
+    # {'N':   'F_SS',                  # job name
+    #  'Py':  'FPVS_make_SourceSpace',          # Python script
+    #  'Ss':  subjs,                    # subject indices
+    #  'mem': '2G',                    # memory for qsub process
+    #  'dep': ''},                      # name of preceeding process (optional)
+    # ### Create BEM surfaces and model
+    # {'N':   'F_BEM',                  # job name
+    #  'Py':  'FPVS_make_BEM',          # Python script
+    #  'Ss':  subjs,                    # subject indices
+    #  'mem': '2G',                    # memory for qsub process
+    #  'dep': 'F_SS'},                      # name of preceeding process (optional)
+    # #  ### Create Forward Solution
+    # {'N':   'F_Fwd',                  # job name
+    #  'Py':  'FPVS_ForwardSolution',          # Python script
+    #  'Ss':  subjs,                    # subject indices
+    #  'mem': '2G',                    # memory for qsub process
+    #  'dep': 'F_BEM'},
+    #  ### Create Inverse Operator
+    # {'N':   'F_Inv',                  # job name
+    #  'Py':  'FPVS_InverseOperator',          # Python script
+    #  'Ss':  subjs,                    # subject indices
+    #  'mem': '2G',                    # memory for qsub process
+    #  'dep': 'F_Fwd'},
+    #  ### Create Inverse Operator
+    # {'N':   'F_SM',                  # job name
+    #  'Py':  'FPVS_SensitivityMaps',          # Python script
+    #  'Ss':  subjs,                    # subject indices
+    #  'mem': '2G',                    # memory for qsub process
+    #  'dep': 'F_Inv'},
 
     #   ### Grand-average and plot source estimates (should be run separately)
-    # {'N':   'F_MNEEVO',                  # job name
+    # {'N':   'F_GMESTC',                  # job name
     #  'Py':  'FPVS_average_evoked_STCs',          # Python script
     #  'Ss':  [99],                    # subject indices
     #  'mem': '2G',                    # memory for qsub process
@@ -118,7 +150,7 @@ job_list = [
     #  'Py':  'FPVS_grand_average_evoked',          # Python script
     #  'Ss':  [99],                    # subject indices
     #  'mem': '2G',                    # memory for qsub process
-    #  'dep': ''},
+    #  'dep': 'F_MNEEVO'},
 
     # ### Compute PSDs for averaged sweeps and plot (change ica_suff in config_sweep.py if necessary)
     # {'N':   'F_P_C',                  # job name
@@ -143,64 +175,16 @@ job_list = [
     # ### Compute Grand-Mean (only for 1 "subject")
     # # cannot be dependent on previous scripts, because they would
     # # have to complete for all participants
-    # {'N':   'F_GM',                  # job name
-    #  'Py':  'FPVS_GrandAverage_PSDs',          # Python script
-    #  'Ss':  [99],                    # subject indices
-    #  'mem': '1G',                    # memory for qsub process
-    #  'dep': ''},
+    {'N':   'F_GM',                  # job name
+     'Py':  'FPVS_GrandAverage_PSDs',          # Python script
+     'Ss':  [99],                    # subject indices
+     'mem': '1G',                    # memory for qsub process
+     'dep': ''},
     # ### Plot Grand-Mean (only for 1 "subject")
     # {'N':   'F_GMP',                  # job name
     #  'Py':  'FPVS_GrandAverage_Plot',          # Python script
     #  'Ss':  [99],                    # subject indices
     #  'mem': '1G',                    # memory for qsub process
-    #  'dep': 'F_GM'},
-
-    #  ### Create BEM surfaces and model
-    # {'N':   'F_Cov',                  # job name
-    #  'Py':  'FPVS_make_covmat',          # Python script
-    #  'Ss':  subjs,                    # subject indices
-    #  'mem': '4G',                    # memory for qsub process
-    #  'dep': ''},
-
-    # ### Create Source Spaces
-    # {'N':   'F_SS',                  # job name
-    #  'Py':  'FPVS_make_SourceSpace',          # Python script
-    #  'Ss':  subjs,                    # subject indices
-    #  'mem': '2G',                    # memory for qsub process
-    #  'dep': ''},                      # name of preceeding process (optional)
-
-    # # ### Create BEM surfaces and model
-    # # # doesn't work - problem with overwrite
-    # # # do manually from terminal window
-    # # {'N':   'F_WS',                  # job name
-    # #  'Py':  'FPVS_make_watershed',          # Python script
-    # #  'Ss':  subjs,                    # subject indices
-    # #  'mem': '2G',                    # memory for qsub process
-    # #  'dep': 'F_SS'}                      # name of preceeding process (optional)
-
-    #  ### Create BEM surfaces and model
-    # {'N':   'F_BEM',                  # job name
-    #  'Py':  'FPVS_make_BEM',          # Python script
-    #  'Ss':  subjs,                    # subject indices
-    #  'mem': '2G',                    # memory for qsub process
-    #  'dep': ''},                      # name of preceeding process (optional)
-    # #  ### Create Forward Solution
-    # {'N':   'F_Fwd',                  # job name
-    #  'Py':  'FPVS_ForwardSolution',          # Python script
-    #  'Ss':  subjs,                    # subject indices
-    #  'mem': '2G',                    # memory for qsub process
-    #  'dep': ''},
-    #  ### Create Inverse Operator
-    # {'N':   'F_InvOp',                  # job name
-    #  'Py':  'FPVS_InverseOperator',          # Python script
-    #  'Ss':  subjs,                    # subject indices
-    #  'mem': '2G',                    # memory for qsub process
-    #  'dep': 'F_Fwd'},
-    #  ### Create Inverse Operator
-    # {'N':   'F_SM',                  # job name
-    #  'Py':  'FPVS_SensitivityMaps',          # Python script
-    #  'Ss':  subjs,                    # subject indices
-    #  'mem': '2G',                    # memory for qsub process
     #  'dep': ''},
 ]
 
@@ -211,6 +195,12 @@ job_list = [
     #  'Ss':  subjs,                    # subject indices
     #  'mem': '4G',                    # memory for qsub process
     #  'dep': 'SR_FR'},                      # name of preceeding process (optional)
+# # ### Filter raw data FM-> generating also txt event file
+    # # {'N':   'F_FR',                  # job name
+    # #  'Py':  'FPVS_filter_raw_sweep_txtfile',          # Python script
+    # #  'Ss':  subjs,                    # subject indices
+    # #  'mem': '16G',                    # memory for qsub process
+    # #  'dep': 'F_FR'},                      # name of preceeding process (optional)
 
 
 # directory where python scripts are

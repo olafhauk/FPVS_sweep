@@ -89,7 +89,7 @@ def run_average_STCs_evoked():
                         config.data_path, config.map_subjects[sbj_id][0])
 
                     stc_fname = op.join(
-                        sbj_path, '%s_f_%s_%s%s_mph' %
+                        sbj_path, 'STC', '%s_f_%s_%s%s_mph' %
                         (cond, config.raw_ICA_suff, ''.join(freq.split('.')),
                          str_notch))
 
